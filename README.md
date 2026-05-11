@@ -34,7 +34,7 @@ Switchboard uses the standard user home directory on each platform. On macOS and
 - Claude Code: `.claude/settings.json`, `.claude/config.json`, and `.claude.json`
 - Codex: `.codex/auth.json` and `.codex/config.toml`
 
-The source is structured for macOS arm64, macOS x64, and Windows x64 packaging. The `Plugin CI` workflow builds, tests, validates, and packages those three targets. Linux entries remain in `manifest.json` for future packaging, but the current compatibility work is focused on macOS and Windows.
+The source keeps platform-aware paths for macOS and Windows, but the current GitHub Actions release/CI path builds and packages Windows x64 only, matching the current official plugin publishing flow. macOS entries remain in `manifest.json` for local development and future packaging.
 
 ## Reference Coverage
 
