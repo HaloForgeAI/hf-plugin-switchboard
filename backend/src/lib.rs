@@ -3,7 +3,14 @@ use hf_plugin_api::{
     PluginMetadata, PLUGIN_ABI_VERSION,
 };
 
+mod backup;
 mod commands;
+mod fs_util;
+mod mcp;
+mod paths;
+mod provider;
+mod status;
+mod types;
 
 pub struct SwitchboardPlugin;
 
