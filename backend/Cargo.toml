@@ -1,0 +1,17 @@
+[package]
+name = "hf-plugin-switchboard"
+version = "0.1.0"
+edition = "2021"
+description = "HaloForge Switchboard plugin backend"
+license = "MIT"
+
+[lib]
+name = "hf_plugin_switchboard"
+crate-type = ["cdylib"]
+
+[dependencies]
+dirs = "6"
+hf-plugin-api = { package = "haloforge-plugin-api", version = "0.2.2" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml_edit = "0.22"

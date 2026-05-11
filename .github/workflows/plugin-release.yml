@@ -1,0 +1,135 @@
+name: Plugin Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "GitHub release tag to create or update"
+        required: true
+      release_name:
+        description: "Optional release title"
+        required: false
+      source:
+        description: "Catalog source label"
+        required: true
+        default: "official"
+
+permissions:
+  contents: write
+
+jobs:
+  package-plugin:
+    name: Package plugin
+    runs-on: windows-latest
+
+    env:
+      HF_PLUGIN_SIGNING_PRIVATE_KEY: ${{ secrets.HF_PLUGIN_SIGNING_PRIVATE_KEY }}
+      HF_PLUGIN_SIGNING_KEY_ID: ${{ secrets.HF_PLUGIN_SIGNING_KEY_ID }}
+      HF_ADMIN_TOKEN: ${{ secrets.HF_ADMIN_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Validate release inputs
+        shell: pwsh
+        run: |
+          $tag = "${{ inputs.release_tag }}".Trim()
+          $title = "${{ inputs.release_name }}".Trim()
+
+          if ([string]::IsNullOrWhiteSpace($tag)) {
+            throw "release_tag is required."
+          }
+          if ($tag -notmatch '^v\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$') {
+            throw "release_tag '$tag' must look like v1.2.3 or v1.2.3-rc.1."
+          }
+          if ([string]::IsNullOrWhiteSpace($title)) {
+            $title = "Switchboard $tag"
+          }
+
+          "RELEASE_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "RELEASE_TITLE=$title" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Package .hfpkg
+        shell: pwsh
+        run: |
+          npx --yes @haloforge/plugin-pack@0.2.2 pack . --release --target x86_64-pc-windows-msvc --out dist/plugin-release
+          $pkg = Get-ChildItem dist/plugin-release -Filter *.hfpkg | Select-Object -First 1
+          if (-not $pkg) { throw "No .hfpkg artifact was created." }
+          $sha = Get-ChildItem dist/plugin-release -Filter *.hfpkg.sha256 | Select-Object -First 1
+          if (-not $sha) { throw "No .hfpkg.sha256 file was created." }
+          "PKG_PATH=$($pkg.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "PKG_NAME=$($pkg.Name)" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "SHA_PATH=$($sha.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Create or update GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          & gh release view $env:RELEASE_TAG --json tagName,url *> $null
+          if ($LASTEXITCODE -ne 0) {
+            & gh release create $env:RELEASE_TAG --title $env:RELEASE_TITLE --notes "Automated HaloForge plugin release"
+            if ($LASTEXITCODE -ne 0) { throw "Failed to create release $env:RELEASE_TAG." }
+          } else {
+            & gh release edit $env:RELEASE_TAG --title $env:RELEASE_TITLE --notes "Automated HaloForge plugin release"
+            if ($LASTEXITCODE -ne 0) { throw "Failed to update release $env:RELEASE_TAG." }
+          }
+          & gh release upload $env:RELEASE_TAG $env:PKG_PATH $env:SHA_PATH --clobber
+          if ($LASTEXITCODE -ne 0) { throw "Failed to upload release assets." }
+
+      - name: Generate catalog draft metadata
+        shell: pwsh
+        run: |
+          $artifactUrl = "https://github.com/${{ github.repository }}/releases/download/$env:RELEASE_TAG/$env:PKG_NAME"
+          $args = @(
+            "--yes", "@haloforge/plugin-pack@0.2.2",
+            "metadata", "$env:PKG_PATH",
+            "--artifact-url", $artifactUrl,
+            "--source", "${{ inputs.source }}",
+            "--homepage-url", "https://haloforge.link/catalog/plugins/switchboard",
+            "--repository-url", "https://github.com/${{ github.repository }}",
+            "--pretty",
+            "--output", "dist/plugin-release/catalog-draft.json"
+          )
+          if ($env:HF_PLUGIN_SIGNING_KEY_ID) {
+            $args += @("--signing-key-id", $env:HF_PLUGIN_SIGNING_KEY_ID)
+          }
+          if ($env:HF_PLUGIN_SIGNING_PRIVATE_KEY) {
+            $args += @("--signing-key-env", "HF_PLUGIN_SIGNING_PRIVATE_KEY")
+          }
+          npx @args
+          if ($LASTEXITCODE -ne 0) { throw "Failed to generate catalog draft metadata." }
+
+      - name: Upload metadata to release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          & gh release upload $env:RELEASE_TAG dist/plugin-release/catalog-draft.json --clobber
+          if ($LASTEXITCODE -ne 0) { throw "Failed to upload catalog metadata." }
+
+      - name: Submit catalog draft
+        if: env.HF_ADMIN_TOKEN != ''
+        shell: pwsh
+        run: npx --yes @haloforge/plugin-pack@0.2.2 submit dist/plugin-release/catalog-draft.json --api-base-url https://admin.haloforge.link --token-env HF_ADMIN_TOKEN
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-release-${{ github.run_id }}
+          path: |
+            dist/plugin-release/*.hfpkg
+            dist/plugin-release/*.hfpkg.sha256
+            dist/plugin-release/catalog-draft.json

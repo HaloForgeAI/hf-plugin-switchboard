@@ -1,0 +1,72 @@
+{
+  "$schema": "https://haloforge.dev/schemas/plugin/v1.json",
+  "id": "dev.haloforge.switchboard",
+  "name": "Switchboard",
+  "version": "0.1.0",
+  "description": "Fast local configuration switching for Claude Code, Codex, and MCP.",
+  "long_description": "Adds a Switchboard module to HaloForge for applying provider endpoints to Claude Code and Codex, importing ccswitch provider links, writing MCP server specs, and restoring local config backups.",
+  "author": "HaloForge Team",
+  "homepage": "https://github.com/HaloForgeAI/hf-plugin-switchboard",
+  "license": "MIT",
+  "keywords": ["claude-code", "codex", "mcp", "provider", "switch"],
+  "icon": "assets/icon.svg",
+  "compatibility": {
+    "min_app_version": "0.6.0",
+    "min_host_api_version": "0.1.0",
+    "platforms": ["windows", "macos", "linux"]
+  },
+  "host_capabilities": ["navigation", "theme_read", "event_subscribe"],
+  "capability_levels": [0],
+  "integration": {
+    "level0": {
+      "module_id": "switchboard",
+      "module_label": "Switchboard",
+      "module_icon": "Cable",
+      "sidebar_position": "main",
+      "sidebar_order": 45,
+      "panel_entry": "frontend/index.js"
+    }
+  },
+  "entry": {
+    "native": {
+      "macos_arm64": "native/aarch64-apple-darwin.dylib",
+      "macos_x64": "native/x86_64-apple-darwin.dylib",
+      "windows_x64": "native/x86_64-pc-windows-msvc.dll",
+      "windows_arm64": "native/aarch64-pc-windows-msvc.dll",
+      "linux_x64": "native/x86_64-unknown-linux-gnu.so",
+      "linux_arm64": "native/aarch64-unknown-linux-gnu.so"
+    },
+    "frontend": "frontend/index.js",
+    "frontend_styles": "frontend/styles.css"
+  },
+  "permissions": [
+    { "type": "ipc_register" },
+    { "type": "filesystem_read" },
+    { "type": "filesystem_write" },
+    { "type": "host_navigation" },
+    { "type": "host_theme_read" },
+    { "type": "host_event_subscribe" }
+  ],
+  "settings_schema": {
+    "type": "object",
+    "properties": {
+      "defaultTarget": {
+        "type": "string",
+        "title": "Default target",
+        "default": "both"
+      },
+      "stableCodexProviderId": {
+        "type": "string",
+        "title": "Stable Codex provider id",
+        "default": "switchboard"
+      }
+    }
+  },
+  "commands": [
+    { "id": "switchboard_status", "description": "Read local Claude Code, Codex, MCP, and backup status" },
+    { "id": "switchboard_apply_provider", "description": "Apply a provider endpoint to Claude Code, Codex, or both" },
+    { "id": "switchboard_list_backups", "description": "List Switchboard backups" },
+    { "id": "switchboard_restore_backup", "description": "Restore a Switchboard backup" },
+    { "id": "switchboard_install_mcp", "description": "Install one MCP server spec into Claude Code and/or Codex" }
+  ]
+}

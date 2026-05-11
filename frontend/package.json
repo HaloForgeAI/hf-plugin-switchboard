@@ -1,0 +1,23 @@
+{
+  "name": "@hf-plugin-switchboard/frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite build --watch"
+  },
+  "dependencies": {
+    "@haloforge/plugin-sdk": "^0.2.2",
+    "@tauri-apps/api": "^2.0.0",
+    "lucide-react": "^0.500.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@vitejs/plugin-react": "^4.5.2",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "typescript": "~5.8.3",
+    "vite": "^6.3.5"
+  }
+}
