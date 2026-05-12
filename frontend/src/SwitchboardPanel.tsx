@@ -54,13 +54,15 @@ export function SwitchboardPanel() {
       ...current,
       target: "claude",
       providerId: current.providerId || settings.stableCodexProviderId || "switchboard",
+      name: settings.providerName?.trim() || current.name,
     }));
     setCodexForm((current) => ({
       ...current,
       target: "codex",
       providerId: current.providerId || settings.stableCodexProviderId || "switchboard",
+      name: settings.providerName?.trim() || current.name,
     }));
-  }, [settings.stableCodexProviderId]);
+  }, [settings.stableCodexProviderId, settings.providerName]);
 
   const importProviderUrl = (target: "claude" | "codex") => {
     try {

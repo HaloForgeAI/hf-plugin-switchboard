@@ -11,7 +11,6 @@ export function parseCcSwitchProviderUrl(raw: string, fallbackProviderId: string
   const endpoint = firstCsvValue(url.searchParams.get("endpoint") || url.searchParams.get("baseUrl") || "");
   const patch: Partial<ProviderForm> = {
     target: app,
-    name: url.searchParams.get("name") || "Imported Provider",
     baseUrl: endpoint,
     apiKey: url.searchParams.get("apiKey") || "",
     model: url.searchParams.get("model") || "",

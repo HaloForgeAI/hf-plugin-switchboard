@@ -60,10 +60,6 @@ export function ProviderPanel({
 
       <div className="sb-form-grid">
         <label>
-          <span>{t("switchboard.provider.name")}</span>
-          <input value={form.name} onChange={(event) => updateForm(setForm, { name: event.target.value })} />
-        </label>
-        <label>
           <span>{t("switchboard.provider.baseUrl")}</span>
           <input
             value={form.baseUrl}

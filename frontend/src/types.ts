@@ -6,6 +6,7 @@ export type BusyState = string | null;
 export interface PluginSettings {
   defaultTarget?: Target;
   stableCodexProviderId?: string;
+  providerName?: string;
 }
 
 export interface PathStatus {
