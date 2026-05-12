@@ -2,7 +2,7 @@
   "$schema": "https://haloforge.dev/schemas/plugin/v1.json",
   "id": "dev.haloforge.switchboard",
   "name": "Switchboard",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Fast local configuration switching for Claude Code, Codex, and MCP.",
   "long_description": "Adds a Switchboard module to HaloForge for applying provider endpoints to Claude Code and Codex, importing ccswitch provider links, writing MCP server specs, and restoring local config backups.",
   "author": "HaloForge Team",

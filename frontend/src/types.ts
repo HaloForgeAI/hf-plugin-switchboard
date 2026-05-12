@@ -70,3 +70,11 @@ export interface McpImportPatch {
   apps: McpAppSelection;
   specText: string;
 }
+
+export interface SkillImportPatch {
+  name: string;
+  app: "claude" | "codex" | "gemini" | "all";
+  repo: string;
+  directory: string;
+  branch: string;
+}

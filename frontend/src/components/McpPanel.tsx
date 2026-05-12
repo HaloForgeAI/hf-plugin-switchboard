@@ -1,4 +1,5 @@
-import { Clipboard, Download, TerminalSquare } from "lucide-react";
+import { Clipboard, ChevronDown, Download, TerminalSquare } from "lucide-react";
+import type { SwitchboardTranslationKey } from "../i18n";
 import type { McpAppSelection } from "../types";
 
 interface McpPanelProps {
@@ -13,6 +14,7 @@ interface McpPanelProps {
   busy: string | null;
   onImport: () => void;
   onInstall: () => void;
+  t: (key: SwitchboardTranslationKey, vars?: Record<string, string | number>) => string;
 }
 
 export function McpPanel({
@@ -27,31 +29,27 @@ export function McpPanel({
   busy,
   onImport,
   onInstall,
+  t,
 }: McpPanelProps) {
   return (
-    <div className="sb-panel">
-      <div className="sb-panel-title">
-        <TerminalSquare size={18} />
-        <h2>MCP</h2>
+    <section className="sb-panel">
+      <div className="sb-section-heading">
+        <div>
+          <h2>{t("switchboard.mcp.title")}</h2>
+          <p>{t("switchboard.mcp.subtitle")}</p>
+        </div>
+        <span className="sb-tab-icon-badge">
+          <TerminalSquare size={16} />
+        </span>
       </div>
-      <div className="sb-ccswitch-row">
-        <input
-          value={mcpImportUrl}
-          onChange={(event) => setMcpImportUrl(event.target.value)}
-          placeholder="ccswitch://v1/import?resource=mcp..."
-          spellCheck={false}
-        />
-        <button type="button" className="sb-secondary-button" onClick={onImport}>
-          <Download size={15} />
-          Import
-        </button>
-      </div>
-      <div className="sb-form-grid sb-mcp-grid">
+
+      <div className="sb-form-grid sb-mcp-fields">
         <label>
-          <span>ID</span>
+          <span>{t("switchboard.mcp.id")}</span>
           <input value={mcpId} onChange={(event) => setMcpId(event.target.value)} spellCheck={false} />
         </label>
-        <div className="sb-options sb-inline-options">
+        <fieldset className="sb-checkbox-group">
+          <legend>{t("switchboard.mcp.apps")}</legend>
           <label>
             <input
               type="checkbox"
@@ -68,20 +66,49 @@ export function McpPanel({
             />
             <span>Codex</span>
           </label>
-        </div>
+        </fieldset>
       </div>
-      <textarea
-        className="sb-json-editor"
-        value={mcpSpec}
-        onChange={(event) => setMcpSpec(event.target.value)}
-        spellCheck={false}
-      />
+
+      <label className="sb-block-field">
+        <span>{t("switchboard.mcp.spec")}</span>
+        <textarea
+          className="sb-json-editor"
+          value={mcpSpec}
+          onChange={(event) => setMcpSpec(event.target.value)}
+          spellCheck={false}
+        />
+      </label>
+
+      <details className="sb-details">
+        <summary>
+          <div className="sb-details-copy">
+            <strong>{t("switchboard.mcp.importTitle")}</strong>
+            <span>{t("switchboard.mcp.importHint")}</span>
+          </div>
+          <ChevronDown size={16} />
+        </summary>
+        <div className="sb-details-body">
+          <div className="sb-ccswitch-row">
+            <input
+              value={mcpImportUrl}
+              onChange={(event) => setMcpImportUrl(event.target.value)}
+              placeholder={t("switchboard.mcp.importPlaceholder")}
+              spellCheck={false}
+            />
+            <button type="button" className="sb-secondary-button" onClick={onImport}>
+              <Download size={15} />
+              {t("switchboard.mcp.importAction")}
+            </button>
+          </div>
+        </div>
+      </details>
+
       <div className="sb-actions">
         <button type="button" className="sb-primary-button" disabled={busy === "mcp"} onClick={onInstall}>
           <Clipboard size={16} />
-          Install
+          {t("switchboard.mcp.install")}
         </button>
       </div>
-    </div>
+    </section>
   );
 }

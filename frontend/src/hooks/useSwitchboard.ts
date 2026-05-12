@@ -1,9 +1,11 @@
 import { invokePlugin } from "@haloforge/plugin-sdk";
 import { useCallback, useEffect, useState } from "react";
 import { formatError } from "../deepLinkImport";
+import { useSwitchboardT } from "../i18n";
 import type { BackupInfo, McpAppSelection, ProviderForm, SwitchboardStatus } from "../types";
 
 export function useSwitchboard() {
+  const t = useSwitchboardT();
   const [status, setStatus] = useState<SwitchboardStatus | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -26,7 +28,10 @@ export function useSwitchboard() {
           "switchboard_apply_provider",
           { ...form },
         );
-        setMessage(`Applied ${result.changedPaths.length} file update(s). Backup ${result.backup.id}.`);
+        setMessage(t("switchboard.message.providerApplied", {
+          count: result.changedPaths.length,
+          backupId: result.backup.id,
+        }));
         await refresh();
       } catch (error) {
         setMessage(formatError(error));
@@ -34,7 +39,7 @@ export function useSwitchboard() {
         setBusy(null);
       }
     },
-    [refresh],
+    [refresh, t],
   );
 
   const installMcp = useCallback(
@@ -51,7 +56,7 @@ export function useSwitchboard() {
           apps: selectedApps,
           spec,
         });
-        setMessage(`Installed MCP into ${result.changedPaths.length} config file(s).`);
+        setMessage(t("switchboard.message.mcpInstalled", { count: result.changedPaths.length }));
         await refresh();
       } catch (error) {
         setMessage(formatError(error));
@@ -59,7 +64,7 @@ export function useSwitchboard() {
         setBusy(null);
       }
     },
-    [refresh],
+    [refresh, t],
   );
 
   const restoreBackup = useCallback(
@@ -70,7 +75,7 @@ export function useSwitchboard() {
         const result = await invokePlugin<{ restoredPaths: string[] }>("switchboard_restore_backup", {
           backupId,
         });
-        setMessage(`Restored ${result.restoredPaths.length} file(s).`);
+        setMessage(t("switchboard.message.backupRestored", { count: result.restoredPaths.length }));
         await refresh();
       } catch (error) {
         setMessage(formatError(error));
@@ -78,7 +83,7 @@ export function useSwitchboard() {
         setBusy(null);
       }
     },
-    [refresh],
+    [refresh, t],
   );
 
   return {

@@ -1,4 +1,4 @@
-import type { McpAppSelection, McpImportPatch, ProviderForm, Target } from "./types";
+import type { McpAppSelection, McpImportPatch, ProviderForm, SkillImportPatch, Target } from "./types";
 
 export function parseCcSwitchProviderUrl(raw: string, fallbackProviderId: string): Partial<ProviderForm> {
   const url = parseCcSwitchUrl(raw);
@@ -54,6 +54,27 @@ export function parseCcSwitchMcpUrl(raw: string): McpImportPatch {
   };
 }
 
+export function parseCcSwitchSkillUrl(raw: string): SkillImportPatch {
+  const url = parseCcSwitchUrl(raw);
+  const resource = url.searchParams.get("resource");
+  if (resource !== "skill") {
+    throw new Error(`Expected resource=skill, received ${resource || "empty"}.`);
+  }
+
+  const repo = url.searchParams.get("repo")?.trim() || "";
+  if (!repo) {
+    throw new Error("Skill import URL requires repo.");
+  }
+
+  return {
+    name: url.searchParams.get("name")?.trim() || repo.split("/").filter(Boolean).pop() || "skill",
+    app: normalizeSkillApp(url.searchParams.get("app")),
+    repo,
+    directory: url.searchParams.get("directory")?.trim() || "",
+    branch: url.searchParams.get("branch")?.trim() || "",
+  };
+}
+
 export function formatError(error: unknown) {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
@@ -77,6 +98,15 @@ function normalizeTarget(value: string | null): Target {
   if (value === "claude" || value === "claude-code" || value === "claudecode") return "claude";
   if (value === "codex") return "codex";
   return "both";
+}
+
+function normalizeSkillApp(value: string | null): SkillImportPatch["app"] {
+  if (!value) return "all";
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "claude" || normalized === "claude-code" || normalized === "claudecode") return "claude";
+  if (normalized === "codex") return "codex";
+  if (normalized === "gemini") return "gemini";
+  return "all";
 }
 
 function parseMcpApps(value: string): McpAppSelection {
