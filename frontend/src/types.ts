@@ -7,6 +7,8 @@ export interface PluginSettings {
   defaultTarget?: Target;
   stableCodexProviderId?: string;
   providerName?: string;
+  defaultModel?: string;
+  modelsPath?: string;
 }
 
 export interface PathStatus {
@@ -20,13 +22,22 @@ export interface TargetStatus {
   label: string;
   configured: boolean;
   summary?: string;
+  details: TargetDetail[];
   paths: PathStatus[];
+}
+
+export interface TargetDetail {
+  label: string;
+  value: string;
+  secret?: string;
 }
 
 export interface BackupFile {
   originalPath: string;
   backupFile?: string | null;
   existed: boolean;
+  byteCount?: number | null;
+  preview?: string | null;
 }
 
 export interface BackupInfo {
@@ -49,6 +60,7 @@ export interface ProviderForm {
   name: string;
   baseUrl: string;
   apiKey: string;
+  modelsPath: string;
   providerId: string;
   model: string;
   reasoningEffort: string;
@@ -70,12 +82,4 @@ export interface McpImportPatch {
   id: string;
   apps: McpAppSelection;
   specText: string;
-}
-
-export interface SkillImportPatch {
-  name: string;
-  app: "claude" | "codex" | "gemini" | "all";
-  repo: string;
-  directory: string;
-  branch: string;
 }

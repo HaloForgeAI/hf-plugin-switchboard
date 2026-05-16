@@ -1,10 +1,10 @@
 {
   "$schema": "https://haloforge.dev/schemas/plugin/v1.json",
   "id": "dev.haloforge.switchboard",
-  "name": "Switchboard",
+  "name": "Provider Router",
   "version": "0.1.2",
-  "description": "Fast local configuration switching for Claude Code, Codex, and MCP.",
-  "long_description": "Adds a Switchboard module to HaloForge for applying provider endpoints to Claude Code and Codex, importing ccswitch provider links, writing MCP server specs, and restoring local config backups.",
+  "description": "Fast local provider configuration for Claude Code, Codex, and MCP.",
+  "long_description": "Adds a HaloForge module for applying provider endpoints to Claude Code and Codex, writing MCP server specs, and restoring local config backups.",
   "author": "HaloForge Team",
   "homepage": "https://github.com/HaloForgeAI/hf-plugin-switchboard",
   "license": "MIT",
@@ -20,7 +20,7 @@
   "integration": {
     "level0": {
       "module_id": "switchboard",
-      "module_label": "Switchboard",
+      "module_label": "Provider Router",
       "module_icon": "Cable",
       "sidebar_position": "main",
       "sidebar_order": 45,
@@ -58,21 +58,32 @@
       "stableCodexProviderId": {
         "type": "string",
         "title": "Stable Codex provider id",
-        "default": "switchboard"
+        "default": "haloforge_gateway"
       },
       "providerName": {
         "type": "string",
         "title": "Provider name",
-        "default": "H3D Gateway",
+        "default": "HaloForge Gateway",
         "minLength": 1
+      },
+      "defaultModel": {
+        "type": "string",
+        "title": "Default model",
+        "default": ""
+      },
+      "modelsPath": {
+        "type": "string",
+        "title": "Models path",
+        "default": "/models"
       }
     }
   },
   "commands": [
     { "id": "switchboard_status", "description": "Read local Claude Code, Codex, MCP, and backup status" },
     { "id": "switchboard_apply_provider", "description": "Apply a provider endpoint to Claude Code, Codex, or both" },
-    { "id": "switchboard_list_backups", "description": "List Switchboard backups" },
-    { "id": "switchboard_restore_backup", "description": "Restore a Switchboard backup" },
-    { "id": "switchboard_install_mcp", "description": "Install one MCP server spec into Claude Code and/or Codex" }
+    { "id": "switchboard_list_backups", "description": "List provider config backups" },
+    { "id": "switchboard_restore_backup", "description": "Restore a provider config backup" },
+    { "id": "switchboard_install_mcp", "description": "Install one MCP server spec into Claude Code and/or Codex" },
+    { "id": "switchboard_discover_models", "description": "List models from an OpenAI-compatible provider endpoint" }
   ]
 }

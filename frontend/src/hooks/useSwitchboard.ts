@@ -1,6 +1,5 @@
 import { invokePlugin } from "@haloforge/plugin-sdk";
 import { useCallback, useEffect, useState } from "react";
-import { formatError } from "../deepLinkImport";
 import { useSwitchboardT } from "../i18n";
 import type { BackupInfo, McpAppSelection, ProviderForm, SwitchboardStatus } from "../types";
 
@@ -67,6 +66,32 @@ export function useSwitchboard() {
     [refresh, t],
   );
 
+  const discoverModels = useCallback(
+    async (form: Pick<ProviderForm, "baseUrl" | "apiKey" | "modelsPath">) => {
+      setBusy("models");
+      setMessage(null);
+      try {
+        const result = await invokePlugin<{ models: string[] }>("switchboard_discover_models", {
+          baseUrl: form.baseUrl,
+          apiKey: form.apiKey,
+          modelsPath: form.modelsPath,
+        });
+        if (result.models.length === 0) {
+          setMessage(t("switchboard.message.modelsEmpty"));
+        } else {
+          setMessage(t("switchboard.message.modelsLoaded", { count: result.models.length }));
+        }
+        return result.models;
+      } catch (error) {
+        setMessage(formatError(error));
+        return [];
+      } finally {
+        setBusy(null);
+      }
+    },
+    [t],
+  );
+
   const restoreBackup = useCallback(
     async (backupId: string) => {
       setBusy(`restore:${backupId}`);
@@ -94,6 +119,13 @@ export function useSwitchboard() {
     refresh,
     applyProvider,
     installMcp,
+    discoverModels,
     restoreBackup,
   };
+}
+
+function formatError(error: unknown) {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  return JSON.stringify(error);
 }

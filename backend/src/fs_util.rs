@@ -129,3 +129,11 @@ pub fn timestamp_id() -> String {
         .as_nanos();
     nanos.to_string()
 }
+
+pub fn timestamp_display() -> String {
+    let secs = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    secs.to_string()
+}

@@ -1,5 +1,6 @@
 import { AppSelect } from "@haloforge/plugin-sdk";
-import { CheckCircle2, ChevronDown, Download, Settings2 } from "lucide-react";
+import { CheckCircle2, ChevronDown, ListFilter, Settings2 } from "lucide-react";
+import { useState } from "react";
 import type { SwitchboardTranslationKey } from "../i18n";
 import type { ProviderForm, SetProviderForm, TargetStatus } from "../types";
 
@@ -8,11 +9,9 @@ interface ProviderPanelProps {
   status?: TargetStatus;
   form: ProviderForm;
   setForm: SetProviderForm;
-  ccswitchUrl: string;
-  setCcswitchUrl: (value: string) => void;
   busy: string | null;
-  onImport: () => void;
   onApply: () => void;
+  onDiscoverModels: () => Promise<string[]>;
   t: (key: SwitchboardTranslationKey, vars?: Record<string, string | number>) => string;
 }
 
@@ -21,14 +20,22 @@ export function ProviderPanel({
   status,
   form,
   setForm,
-  ccswitchUrl,
-  setCcswitchUrl,
   busy,
-  onImport,
   onApply,
+  onDiscoverModels,
   t,
 }: ProviderPanelProps) {
   const isClaude = target === "claude";
+  const [modelOptions, setModelOptions] = useState<string[]>([]);
+  const hasModelOptions = modelOptions.length > 0;
+
+  const handleDiscoverModels = async () => {
+    const models = await onDiscoverModels();
+    setModelOptions(models);
+    if (!form.model && models[0]) {
+      updateForm(setForm, { model: models[0] });
+    }
+  };
 
   return (
     <section className="sb-panel">
@@ -79,37 +86,44 @@ export function ProviderPanel({
         </label>
         <label>
           <span>{t("switchboard.provider.model")}</span>
+          <div className="sb-model-picker">
+            <input
+              value={form.model}
+              onChange={(event) => updateForm(setForm, { model: event.target.value })}
+              list={`${target}-model-options`}
+              spellCheck={false}
+            />
+            <button
+              type="button"
+              className="sb-icon-button"
+              disabled={busy === "models"}
+              onClick={() => void handleDiscoverModels()}
+              title={t("switchboard.provider.fetchModels")}
+            >
+              <ListFilter size={15} />
+            </button>
+          </div>
+          {hasModelOptions && (
+            <datalist id={`${target}-model-options`}>
+              {modelOptions.map((model) => (
+                <option value={model} key={model} />
+              ))}
+            </datalist>
+          )}
+        </label>
+      </div>
+
+      <div className="sb-form-grid">
+        <label>
+          <span>{t("switchboard.provider.modelsPath")}</span>
           <input
-            value={form.model}
-            onChange={(event) => updateForm(setForm, { model: event.target.value })}
+            value={form.modelsPath}
+            onChange={(event) => updateForm(setForm, { modelsPath: event.target.value })}
+            placeholder="/models"
             spellCheck={false}
           />
         </label>
       </div>
-
-      <details className="sb-details">
-        <summary>
-          <div className="sb-details-copy">
-            <strong>{t("switchboard.provider.importTitle")}</strong>
-            <span>{t("switchboard.provider.importHint")}</span>
-          </div>
-          <ChevronDown size={16} />
-        </summary>
-        <div className="sb-details-body">
-          <div className="sb-ccswitch-row">
-            <input
-              value={ccswitchUrl}
-              onChange={(event) => setCcswitchUrl(event.target.value)}
-              placeholder={t("switchboard.provider.importPlaceholder")}
-              spellCheck={false}
-            />
-            <button type="button" className="sb-secondary-button" onClick={onImport}>
-              <Download size={15} />
-              {t("switchboard.provider.importAction")}
-            </button>
-          </div>
-        </div>
-      </details>
 
       <details className="sb-details">
         <summary>

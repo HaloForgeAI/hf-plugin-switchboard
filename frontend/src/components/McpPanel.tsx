@@ -1,18 +1,15 @@
-import { Clipboard, ChevronDown, Download, TerminalSquare } from "lucide-react";
+import { Clipboard, TerminalSquare } from "lucide-react";
 import type { SwitchboardTranslationKey } from "../i18n";
 import type { McpAppSelection } from "../types";
 
 interface McpPanelProps {
   mcpId: string;
   setMcpId: (value: string) => void;
-  mcpImportUrl: string;
-  setMcpImportUrl: (value: string) => void;
   mcpApps: McpAppSelection;
   setMcpApps: (updater: (current: McpAppSelection) => McpAppSelection) => void;
   mcpSpec: string;
   setMcpSpec: (value: string) => void;
   busy: string | null;
-  onImport: () => void;
   onInstall: () => void;
   t: (key: SwitchboardTranslationKey, vars?: Record<string, string | number>) => string;
 }
@@ -20,14 +17,11 @@ interface McpPanelProps {
 export function McpPanel({
   mcpId,
   setMcpId,
-  mcpImportUrl,
-  setMcpImportUrl,
   mcpApps,
   setMcpApps,
   mcpSpec,
   setMcpSpec,
   busy,
-  onImport,
   onInstall,
   t,
 }: McpPanelProps) {
@@ -78,30 +72,6 @@ export function McpPanel({
           spellCheck={false}
         />
       </label>
-
-      <details className="sb-details">
-        <summary>
-          <div className="sb-details-copy">
-            <strong>{t("switchboard.mcp.importTitle")}</strong>
-            <span>{t("switchboard.mcp.importHint")}</span>
-          </div>
-          <ChevronDown size={16} />
-        </summary>
-        <div className="sb-details-body">
-          <div className="sb-ccswitch-row">
-            <input
-              value={mcpImportUrl}
-              onChange={(event) => setMcpImportUrl(event.target.value)}
-              placeholder={t("switchboard.mcp.importPlaceholder")}
-              spellCheck={false}
-            />
-            <button type="button" className="sb-secondary-button" onClick={onImport}>
-              <Download size={15} />
-              {t("switchboard.mcp.importAction")}
-            </button>
-          </div>
-        </div>
-      </details>
 
       <div className="sb-actions">
         <button type="button" className="sb-primary-button" disabled={busy === "mcp"} onClick={onInstall}>

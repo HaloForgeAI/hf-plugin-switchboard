@@ -1,18 +1,16 @@
 import { usePluginSettings } from "@haloforge/plugin-sdk";
-import { Bot, Braces, LayoutDashboard, RefreshCcw, Shield, Sparkles, TerminalSquare } from "lucide-react";
+import { Bot, Braces, LayoutDashboard, RefreshCcw, Shield, TerminalSquare } from "lucide-react";
 import { useEffect, useState } from "react";
 import { BackupPanel } from "./components/BackupPanel";
 import { McpPanel } from "./components/McpPanel";
 import { ProviderPanel } from "./components/ProviderPanel";
-import { SkillsPanel } from "./components/SkillsPanel";
 import { TargetCard } from "./components/TargetCard";
-import { DEFAULT_MCP_SPEC, defaultProviderForm } from "./defaults";
-import { parseCcSwitchMcpUrl, parseCcSwitchProviderUrl, parseCcSwitchSkillUrl, formatError } from "./deepLinkImport";
+import { DEFAULT_CODEX_PROVIDER_ID, DEFAULT_MCP_SPEC, defaultProviderForm } from "./defaults";
 import { useSwitchboardT } from "./i18n";
 import { useSwitchboard } from "./hooks/useSwitchboard";
-import type { McpAppSelection, PluginSettings, ProviderForm, SkillImportPatch, TargetStatus } from "./types";
+import type { McpAppSelection, PluginSettings, ProviderForm, TargetStatus } from "./types";
 
-type SwitchboardTab = "overview" | "claude" | "codex" | "mcp" | "skills" | "backups";
+type SwitchboardTab = "overview" | "claude" | "codex" | "mcp" | "backups";
 
 function buildProviderForm(settings: PluginSettings, target: ProviderForm["target"]): ProviderForm {
   return {
@@ -27,25 +25,20 @@ export function SwitchboardPanel() {
   const [activeTab, setActiveTab] = useState<SwitchboardTab>("overview");
   const [claudeForm, setClaudeForm] = useState(() => buildProviderForm({}, "claude"));
   const [codexForm, setCodexForm] = useState(() => buildProviderForm({}, "codex"));
-  const [claudeImportUrl, setClaudeImportUrl] = useState("");
-  const [codexImportUrl, setCodexImportUrl] = useState("");
   const [mcpId, setMcpId] = useState("context7");
-  const [mcpImportUrl, setMcpImportUrl] = useState("");
   const [mcpApps, setMcpApps] = useState<McpAppSelection>({
     claude: true,
     codex: true,
   });
   const [mcpSpec, setMcpSpec] = useState(DEFAULT_MCP_SPEC);
-  const [skillImportUrl, setSkillImportUrl] = useState("");
-  const [skillImport, setSkillImport] = useState<SkillImportPatch | null>(null);
   const {
     status,
     busy,
     message,
-    setMessage,
     refresh,
     applyProvider,
     installMcp,
+    discoverModels,
     restoreBackup,
   } = useSwitchboard();
 
@@ -53,58 +46,20 @@ export function SwitchboardPanel() {
     setClaudeForm((current) => ({
       ...current,
       target: "claude",
-      providerId: current.providerId || settings.stableCodexProviderId || "switchboard",
+      providerId: current.providerId || settings.stableCodexProviderId || DEFAULT_CODEX_PROVIDER_ID,
       name: settings.providerName?.trim() || current.name,
+      model: current.model || settings.defaultModel?.trim() || "",
+      modelsPath: current.modelsPath || settings.modelsPath?.trim() || "/models",
     }));
     setCodexForm((current) => ({
       ...current,
       target: "codex",
-      providerId: current.providerId || settings.stableCodexProviderId || "switchboard",
+      providerId: current.providerId || settings.stableCodexProviderId || DEFAULT_CODEX_PROVIDER_ID,
       name: settings.providerName?.trim() || current.name,
+      model: current.model || settings.defaultModel?.trim() || "",
+      modelsPath: current.modelsPath || settings.modelsPath?.trim() || "/models",
     }));
-  }, [settings.stableCodexProviderId, settings.providerName]);
-
-  const importProviderUrl = (target: "claude" | "codex") => {
-    try {
-      const currentForm = target === "claude" ? claudeForm : codexForm;
-      const url = target === "claude" ? claudeImportUrl : codexImportUrl;
-      const patch = parseCcSwitchProviderUrl(url, currentForm.providerId);
-      const normalizedPatch = {
-        ...patch,
-        target,
-      };
-      if (target === "claude") {
-        setClaudeForm((current) => ({ ...current, ...normalizedPatch }));
-      } else {
-        setCodexForm((current) => ({ ...current, ...normalizedPatch }));
-      }
-      setMessage(t("switchboard.message.providerImported"));
-    } catch (error) {
-      setMessage(formatError(error));
-    }
-  };
-
-  const importMcpUrl = () => {
-    try {
-      const patch = parseCcSwitchMcpUrl(mcpImportUrl);
-      setMcpId(patch.id);
-      setMcpApps(patch.apps);
-      setMcpSpec(patch.specText);
-      setMessage(t("switchboard.message.mcpImported"));
-    } catch (error) {
-      setMessage(formatError(error));
-    }
-  };
-
-  const importSkillUrl = () => {
-    try {
-      const patch = parseCcSwitchSkillUrl(skillImportUrl);
-      setSkillImport(patch);
-      setMessage(t("switchboard.message.skillImported"));
-    } catch (error) {
-      setMessage(formatError(error));
-    }
-  };
+  }, [settings.stableCodexProviderId, settings.providerName, settings.defaultModel, settings.modelsPath]);
 
   const configuredCount = status?.targets.filter((target) => target.configured).length ?? 0;
   const backupCount = status?.backups.length ?? 0;
@@ -120,7 +75,6 @@ export function SwitchboardPanel() {
     { id: "claude", label: t("switchboard.tab.claude"), icon: Bot },
     { id: "codex", label: t("switchboard.tab.codex"), icon: Braces },
     { id: "mcp", label: t("switchboard.tab.mcp"), icon: TerminalSquare },
-    { id: "skills", label: t("switchboard.tab.skills"), icon: Sparkles },
     { id: "backups", label: t("switchboard.tab.backups"), icon: Shield },
   ];
 
@@ -141,7 +95,7 @@ export function SwitchboardPanel() {
         </button>
       </header>
 
-      <nav className="sb-tabbar" aria-label="Switchboard sections">
+      <nav className="sb-tabbar" aria-label="Provider router sections">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           return (
@@ -206,11 +160,9 @@ export function SwitchboardPanel() {
             status={claudeStatus}
             form={claudeForm}
             setForm={setClaudeForm}
-            ccswitchUrl={claudeImportUrl}
-            setCcswitchUrl={setClaudeImportUrl}
             busy={busy}
-            onImport={() => importProviderUrl("claude")}
             onApply={() => void applyProvider(claudeForm)}
+            onDiscoverModels={() => discoverModels(claudeForm)}
             t={t}
           />
         </section>
@@ -223,11 +175,9 @@ export function SwitchboardPanel() {
             status={codexStatus}
             form={codexForm}
             setForm={setCodexForm}
-            ccswitchUrl={codexImportUrl}
-            setCcswitchUrl={setCodexImportUrl}
             busy={busy}
-            onImport={() => importProviderUrl("codex")}
             onApply={() => void applyProvider(codexForm)}
+            onDiscoverModels={() => discoverModels(codexForm)}
             t={t}
           />
         </section>
@@ -238,27 +188,12 @@ export function SwitchboardPanel() {
           <McpPanel
             mcpId={mcpId}
             setMcpId={setMcpId}
-            mcpImportUrl={mcpImportUrl}
-            setMcpImportUrl={setMcpImportUrl}
             mcpApps={mcpApps}
             setMcpApps={setMcpApps}
             mcpSpec={mcpSpec}
             setMcpSpec={setMcpSpec}
             busy={busy}
-            onImport={importMcpUrl}
             onInstall={() => void installMcp(mcpId, mcpApps, mcpSpec)}
-            t={t}
-          />
-        </section>
-      )}
-
-      {activeTab === "skills" && (
-        <section className="sb-pane">
-          <SkillsPanel
-            skillImportUrl={skillImportUrl}
-            setSkillImportUrl={setSkillImportUrl}
-            skillImport={skillImport}
-            onImport={importSkillUrl}
             t={t}
           />
         </section>

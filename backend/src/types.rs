@@ -4,7 +4,8 @@ use serde_json::Value;
 pub const CLAUDE_TARGET: &str = "claude";
 pub const CODEX_TARGET: &str = "codex";
 pub const BOTH_TARGET: &str = "both";
-pub const DEFAULT_CODEX_PROVIDER_ID: &str = "switchboard";
+pub const DEFAULT_CODEX_PROVIDER_ID: &str = "haloforge_gateway";
+pub const LEGACY_CODEX_PROVIDER_ID: &str = "switchboard";
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -21,7 +22,17 @@ pub struct TargetStatus {
     pub label: String,
     pub configured: bool,
     pub summary: Option<String>,
+    pub details: Vec<TargetDetail>,
     pub paths: Vec<PathStatus>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TargetDetail {
+    pub label: String,
+    pub value: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub secret: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -49,6 +60,10 @@ pub struct BackupFile {
     pub original_path: String,
     pub backup_file: Option<String>,
     pub existed: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub byte_count: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preview: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -100,4 +115,18 @@ pub struct InstallMcpArgs {
 #[serde(rename_all = "camelCase")]
 pub struct InstallMcpResult {
     pub changed_paths: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiscoverModelsArgs {
+    pub base_url: String,
+    pub api_key: String,
+    pub models_path: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiscoverModelsResult {
+    pub models: Vec<String>,
 }

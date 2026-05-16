@@ -1,8 +1,8 @@
 use crate::fs_util::{display_path, pathbufs_to_strings};
 use crate::paths::SwitchboardPaths;
 use crate::types::{
-    ApplyProviderArgs, ApplyProviderResult, InstallMcpArgs, InstallMcpResult, RestoreBackupArgs,
-    RestoreBackupResult,
+    ApplyProviderArgs, ApplyProviderResult, DiscoverModelsArgs, InstallMcpArgs, InstallMcpResult,
+    RestoreBackupArgs, RestoreBackupResult,
 };
 use crate::{backup, mcp, provider, status};
 use hf_plugin_api::{PluginContext, PluginError};
@@ -89,6 +89,15 @@ pub fn switchboard_install_mcp(args: Value, ctx: &dyn PluginContext) -> Result<V
     to_value(InstallMcpResult {
         changed_paths: pathbufs_to_strings(&touched),
     })
+}
+
+pub fn switchboard_discover_models(
+    args: Value,
+    _ctx: &dyn PluginContext,
+) -> Result<Value, PluginError> {
+    let args: DiscoverModelsArgs = parse_args(args)?;
+    provider::validate_models_args(&args)?;
+    to_value(provider::discover_models(&args)?)
 }
 
 fn parse_args<T: for<'de> Deserialize<'de>>(args: Value) -> Result<T, PluginError> {

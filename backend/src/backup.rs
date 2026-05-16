@@ -1,4 +1,6 @@
-use crate::fs_util::{display_path, read_json_typed, timestamp_id, write_json_pretty};
+use crate::fs_util::{
+    display_path, read_json_typed, timestamp_display, timestamp_id, write_json_pretty,
+};
 use crate::types::{BackupFile, BackupInfo};
 use hf_plugin_api::{PluginContext, PluginError};
 use std::collections::BTreeSet;
@@ -27,28 +29,44 @@ pub fn create_backup(
             fs::copy(&path, dir.join(&backup_file)).map_err(|error| {
                 PluginError::Io(format!("failed to back up {}: {error}", path.display()))
             })?;
+            let bytes = fs::read(&path)?;
             files.push(BackupFile {
                 original_path: path_text,
                 backup_file: Some(backup_file),
                 existed: true,
+                byte_count: Some(bytes.len() as u64),
+                preview: Some(preview_bytes(&bytes)),
             });
         } else {
             files.push(BackupFile {
                 original_path: path_text,
                 backup_file: None,
                 existed: false,
+                byte_count: None,
+                preview: None,
             });
         }
     }
 
     let backup = BackupInfo {
         id: id.clone(),
-        created_at: id,
+        created_at: timestamp_display(),
         path: display_path(&dir),
         files,
     };
     write_json_pretty(&dir.join("manifest.json"), &backup)?;
     Ok(backup)
+}
+
+fn preview_bytes(bytes: &[u8]) -> String {
+    const LIMIT: usize = 1600;
+    let text = String::from_utf8_lossy(bytes);
+    let preview = text.chars().take(LIMIT).collect::<String>();
+    if text.chars().count() > LIMIT {
+        format!("{preview}\n...")
+    } else {
+        preview
+    }
 }
 
 pub fn list_backup_infos(ctx: &dyn PluginContext) -> Result<Vec<BackupInfo>, PluginError> {

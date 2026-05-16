@@ -1,6 +1,7 @@
 import type { PluginSettings, ProviderForm } from "./types";
 
-export const DEFAULT_PROVIDER_NAME = "H3D Gateway";
+export const DEFAULT_PROVIDER_NAME = "HaloForge Gateway";
+export const DEFAULT_CODEX_PROVIDER_ID = "haloforge_gateway";
 
 export const DEFAULT_MCP_SPEC = `{
   "type": "stdio",
@@ -14,8 +15,9 @@ export function defaultProviderForm(settings: PluginSettings): ProviderForm {
     name: settings.providerName?.trim() || DEFAULT_PROVIDER_NAME,
     baseUrl: "",
     apiKey: "",
-    providerId: settings.stableCodexProviderId ?? "switchboard",
-    model: "",
+    modelsPath: settings.modelsPath?.trim() || "/models",
+    providerId: settings.stableCodexProviderId ?? DEFAULT_CODEX_PROVIDER_ID,
+    model: settings.defaultModel?.trim() || "",
     reasoningEffort: "high",
     haikuModel: "",
     sonnetModel: "",

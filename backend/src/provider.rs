@@ -5,6 +5,7 @@ use crate::fs_util::{
 use crate::paths::SwitchboardPaths;
 use crate::types::{
     ApplyProviderArgs, BOTH_TARGET, CLAUDE_TARGET, CODEX_TARGET, DEFAULT_CODEX_PROVIDER_ID,
+    DiscoverModelsArgs, DiscoverModelsResult, LEGACY_CODEX_PROVIDER_ID,
 };
 use hf_plugin_api::PluginError;
 use serde_json::{json, Map, Value};
@@ -32,6 +33,26 @@ pub fn validate_provider_args(args: &ApplyProviderArgs) -> Result<(), PluginErro
         return Err(PluginError::Custom("API key is required".into()));
     }
     Ok(())
+}
+
+pub fn validate_models_args(args: &DiscoverModelsArgs) -> Result<(), PluginError> {
+    if args.base_url.trim().is_empty() {
+        return Err(PluginError::Custom("base URL is required".into()));
+    }
+    if args.api_key.trim().is_empty() {
+        return Err(PluginError::Custom("API key is required".into()));
+    }
+    Ok(())
+}
+
+pub fn discover_models(args: &DiscoverModelsArgs) -> Result<DiscoverModelsResult, PluginError> {
+    let url = build_models_url(&args.base_url, args.models_path.as_deref());
+    let body = http_get_json(&url, args.api_key.trim())?;
+    let root: Value = serde_json::from_str(&body).map_err(|error| {
+        PluginError::Serialization(format!("models response is not valid JSON: {error}"))
+    })?;
+    let models = parse_model_ids(&root);
+    Ok(DiscoverModelsResult { models })
 }
 
 pub fn provider_backup_paths(
@@ -154,7 +175,11 @@ fn write_codex_provider(
     let model = defaulted(args.model.as_deref(), "gpt-5.4");
     let reasoning = defaulted(args.reasoning_effort.as_deref(), "high");
     let base_url = normalize_codex_base_url(&args.base_url);
-    let auth = json!({ "OPENAI_API_KEY": args.api_key.trim() });
+    let mut auth = read_json_object_or_empty(&paths.codex_auth_path)?;
+    let auth_object = auth.as_object_mut().ok_or_else(|| {
+        PluginError::Serialization("Codex auth root must be an object".into())
+    })?;
+    auth_object.insert("OPENAI_API_KEY".into(), json!(args.api_key.trim()));
     let config_text = build_codex_config_text(
         &paths.codex_config_path,
         &provider_id,
@@ -232,6 +257,15 @@ fn apply_codex_provider_doc(
         doc["model_providers"] = Item::Table(Table::new());
     }
 
+    if provider_id != LEGACY_CODEX_PROVIDER_ID {
+        if let Some(providers) = doc
+            .get_mut("model_providers")
+            .and_then(|item| item.as_table_like_mut())
+        {
+            providers.remove(LEGACY_CODEX_PROVIDER_ID);
+        }
+    }
+
     let mut provider = Table::new();
     provider["name"] = toml_edit::value(if name.is_empty() { provider_id } else { name });
     provider["base_url"] = toml_edit::value(base_url);
@@ -304,6 +338,55 @@ pub fn normalize_codex_base_url(value: &str) -> String {
     }
 }
 
+fn build_models_url(base_url: &str, models_path: Option<&str>) -> String {
+    let base = normalize_codex_base_url(base_url);
+    let path = models_path
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("/models");
+    if path.starts_with("http://") || path.starts_with("https://") {
+        return path.to_string();
+    }
+    let normalized_path = if path.starts_with('/') {
+        path.to_string()
+    } else {
+        format!("/{path}")
+    };
+    format!("{}{}", base.trim_end_matches('/'), normalized_path)
+}
+
+fn parse_model_ids(root: &Value) -> Vec<String> {
+    let Some(data) = root.get("data").and_then(Value::as_array) else {
+        return Vec::new();
+    };
+    let mut models = data
+        .iter()
+        .filter_map(|item| {
+            item.get("id")
+                .and_then(Value::as_str)
+                .or_else(|| item.get("name").and_then(Value::as_str))
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string)
+        })
+        .collect::<Vec<_>>();
+    models.sort();
+    models.dedup();
+    models
+}
+
+fn http_get_json(url: &str, api_key: &str) -> Result<String, PluginError> {
+    let response = ureq::get(url)
+        .set("Authorization", &format!("Bearer {api_key}"))
+        .set("Accept", "application/json")
+        .timeout(std::time::Duration::from_secs(12))
+        .call()
+        .map_err(|error| PluginError::Custom(format!("models request failed: {error}")))?;
+    response
+        .into_string()
+        .map_err(|error| PluginError::Io(format!("failed to read models response: {error}")))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -371,5 +454,42 @@ model = "gpt-4"
                 .and_then(|item| item.as_str()),
             Some("https://new.example/v1")
         );
+    }
+
+    #[test]
+    fn codex_provider_removes_legacy_switchboard_provider_when_using_new_id() {
+        let mut doc = r#"model_provider = "switchboard"
+model = "gpt-4"
+
+[model_providers.switchboard]
+name = "Switchboard"
+base_url = "https://old.example/v1"
+wire_api = "responses"
+
+[model_providers.other]
+name = "Other"
+base_url = "https://other.example/v1"
+wire_api = "responses"
+"#
+        .parse::<DocumentMut>()
+        .expect("valid toml");
+
+        apply_codex_provider_doc(
+            &mut doc,
+            "haloforge_gateway",
+            "HaloForge Gateway",
+            "https://new.example/v1",
+            "gpt-5.4",
+            "high",
+        );
+
+        let parsed: DocumentMut = doc.to_string().parse().expect("valid output");
+        let providers = parsed
+            .get("model_providers")
+            .and_then(|item| item.as_table())
+            .expect("providers table");
+        assert!(providers.get("switchboard").is_none());
+        assert!(providers.get("haloforge_gateway").is_some());
+        assert!(providers.get("other").is_some());
     }
 }

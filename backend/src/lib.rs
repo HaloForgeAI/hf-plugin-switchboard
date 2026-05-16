@@ -61,6 +61,10 @@ impl HaloForgePlugin for SwitchboardPlugin {
             "switchboard_install_mcp",
             Box::new(commands::switchboard_install_mcp),
         )?;
+        ipc.register(
+            "switchboard_discover_models",
+            Box::new(commands::switchboard_discover_models),
+        )?;
 
         ctx.log(LogLevel::Info, "Switchboard plugin loaded");
         Ok(())
