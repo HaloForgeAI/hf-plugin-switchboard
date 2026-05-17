@@ -35,6 +35,7 @@ export function SwitchboardPanel() {
     status,
     busy,
     message,
+    setMessage,
     refresh,
     applyProvider,
     installMcp,
