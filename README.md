@@ -78,3 +78,13 @@ Package:
 ```bash
 npx --yes @haloforge/plugin-pack@0.2.5 pack . --release
 ```
+
+Install the packaged plugin into a local HaloForge workspace with the `hf` CLI:
+
+```bash
+cd /path/to/HaloForge
+npm run hf -- plugin install local /path/to/hf-plugin-switchboard/dist/package/dev.haloforge.switchboard-0.1.3.hfpkg --json
+npm run hf -- plugin list --json
+```
+
+`npm run hf -- ...` is the source-checkout form. Windows installed builds add `hf` to PATH, so a new terminal can use `hf plugin ...` directly. macOS automatic PATH linking is not implemented yet; run `command -v hf` before assuming the global command exists.
