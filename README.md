@@ -70,20 +70,20 @@ npm run build
 Validate with the public packer:
 
 ```bash
-npx --yes @haloforge/plugin-pack@0.2.5 check .
+npx --yes @haloforge/plugin-pack@0.2.9 check .
 ```
 
 Package:
 
 ```bash
-npx --yes @haloforge/plugin-pack@0.2.5 pack . --release
+npx --yes @haloforge/plugin-pack@0.2.9 pack . --release
 ```
 
 Install the packaged plugin into a local HaloForge workspace with the `hf` CLI:
 
 ```bash
 cd /path/to/HaloForge
-npm run hf -- plugin install local /path/to/hf-plugin-switchboard/dist/package/dev.haloforge.switchboard-0.1.4.hfpkg --json
+npm run hf -- plugin install local /path/to/hf-plugin-switchboard/dist/package/dev.haloforge.switchboard-0.1.5.hfpkg --json
 npm run hf -- plugin list --json
 ```
 
