@@ -4,14 +4,24 @@ use crate::fs_util::{
 };
 use crate::paths::SwitchboardPaths;
 use crate::types::{
-    ApplyProviderArgs, BOTH_TARGET, CLAUDE_TARGET, CODEX_TARGET, DEFAULT_CODEX_PROVIDER_ID,
-    DiscoverModelsArgs, DiscoverModelsResult, LEGACY_CODEX_PROVIDER_ID,
+    ApplyProviderArgs, BOTH_TARGET, CLAUDE_TARGET, CleanupCodexArgs, CODEX_TARGET,
+    DEFAULT_CODEX_PROVIDER_ID, DiscoverModelsArgs, DiscoverModelsResult, LEGACY_CODEX_PROVIDER_ID,
 };
 use hf_plugin_api::PluginError;
 use serde_json::{json, Map, Value};
 use std::fs;
 use std::path::Path;
 use toml_edit::{DocumentMut, Item, Table};
+
+const CODEX_BUILTIN_PLUGINS: &[(&str, &str)] = &[
+    ("browser@openai-bundled", "Browser"),
+    ("chrome@openai-bundled", "Chrome"),
+    ("computer-use@openai-bundled", "Computer Use"),
+    ("documents@openai-primary-runtime", "Documents"),
+    ("spreadsheets@openai-primary-runtime", "Spreadsheets"),
+    ("presentations@openai-primary-runtime", "Presentations"),
+    ("github@openai-curated", "GitHub"),
+];
 
 pub fn validate_provider_args(args: &ApplyProviderArgs) -> Result<(), PluginError> {
     if !matches!(
@@ -76,6 +86,10 @@ pub fn provider_backup_paths(
     backup_paths
 }
 
+pub fn codex_cleanup_backup_paths(paths: &SwitchboardPaths) -> Vec<std::path::PathBuf> {
+    vec![paths.codex_auth_path.clone(), paths.codex_config_path.clone()]
+}
+
 pub fn apply_provider(
     paths: &SwitchboardPaths,
     args: &ApplyProviderArgs,
@@ -103,6 +117,30 @@ pub fn apply_provider(
         touched.push(paths.codex_config_path.clone());
     }
 
+    Ok(touched)
+}
+
+pub fn cleanup_codex_custom_api(
+    paths: &SwitchboardPaths,
+    args: &CleanupCodexArgs,
+) -> Result<Vec<std::path::PathBuf>, PluginError> {
+    let provider_id = args
+        .provider_id
+        .as_deref()
+        .map(sanitize_provider_id)
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| DEFAULT_CODEX_PROVIDER_ID.to_string());
+
+    let auth_changed = cleanup_codex_auth(&paths.codex_auth_path)?;
+    let config_changed = cleanup_codex_config(&paths.codex_config_path, &provider_id)?;
+
+    let mut touched = Vec::new();
+    if auth_changed {
+        touched.push(paths.codex_auth_path.clone());
+    }
+    if config_changed {
+        touched.push(paths.codex_config_path.clone());
+    }
     Ok(touched)
 }
 
@@ -162,6 +200,44 @@ fn set_claude_onboarding(path: &Path) -> Result<(), PluginError> {
     write_json_pretty(path, &root)
 }
 
+fn cleanup_codex_auth(path: &Path) -> Result<bool, PluginError> {
+    if !path.exists() {
+        return Ok(false);
+    }
+
+    let mut root = read_json_object_or_empty(path)?;
+    let object = root
+        .as_object_mut()
+        .ok_or_else(|| PluginError::Serialization("Codex auth root must be an object".into()))?;
+
+    let had_api_key = object.remove("OPENAI_API_KEY").is_some();
+    if had_api_key {
+        object
+            .entry("auth_mode")
+            .or_insert_with(|| json!("chatgpt"));
+        write_json_pretty(path, &root)?;
+    }
+
+    Ok(had_api_key)
+}
+
+fn cleanup_codex_config(path: &Path, provider_id: &str) -> Result<bool, PluginError> {
+    if !path.exists() {
+        return Ok(false);
+    }
+
+    let mut doc = read_existing_codex_doc(path)?;
+    let changed = cleanup_codex_config_doc(&mut doc, provider_id);
+    if changed {
+        let text = doc.to_string();
+        text.parse::<DocumentMut>().map_err(|error| {
+            PluginError::Serialization(format!("generated Codex config.toml is invalid: {error}"))
+        })?;
+        atomic_write(path, text.as_bytes())?;
+    }
+    Ok(changed)
+}
+
 fn write_codex_provider(
     paths: &SwitchboardPaths,
     args: &ApplyProviderArgs,
@@ -179,7 +255,12 @@ fn write_codex_provider(
     let auth_object = auth.as_object_mut().ok_or_else(|| {
         PluginError::Serialization("Codex auth root must be an object".into())
     })?;
-    auth_object.insert("OPENAI_API_KEY".into(), json!(args.api_key.trim()));
+    if args.preserve_codex_chatgpt_auth.unwrap_or(false) {
+        auth_object.insert("auth_mode".into(), json!("chatgpt"));
+        auth_object.insert("OPENAI_API_KEY".into(), Value::Null);
+    } else {
+        auth_object.insert("OPENAI_API_KEY".into(), json!(args.api_key.trim()));
+    }
     let config_text = build_codex_config_text(
         &paths.codex_config_path,
         &provider_id,
@@ -187,6 +268,9 @@ fn write_codex_provider(
         &base_url,
         &model,
         &reasoning,
+        args.api_key.trim(),
+        args.enable_codex_builtin_plugins.unwrap_or(false),
+        args.preserve_codex_chatgpt_auth.unwrap_or(false),
     )?;
 
     write_codex_live_atomic(
@@ -204,6 +288,9 @@ fn build_codex_config_text(
     base_url: &str,
     model: &str,
     reasoning_effort: &str,
+    api_key: &str,
+    enable_builtin_plugins: bool,
+    preserve_chatgpt_auth: bool,
 ) -> Result<String, PluginError> {
     let mut doc = read_existing_codex_doc(config_path)?;
     apply_codex_provider_doc(
@@ -213,6 +300,9 @@ fn build_codex_config_text(
         base_url,
         model,
         reasoning_effort,
+        api_key,
+        enable_builtin_plugins,
+        preserve_chatgpt_auth,
     );
 
     let text = doc.to_string();
@@ -247,6 +337,9 @@ fn apply_codex_provider_doc(
     base_url: &str,
     model: &str,
     reasoning_effort: &str,
+    api_key: &str,
+    enable_builtin_plugins: bool,
+    preserve_chatgpt_auth: bool,
 ) {
     doc["model_provider"] = toml_edit::value(provider_id);
     doc["model"] = toml_edit::value(model);
@@ -271,7 +364,100 @@ fn apply_codex_provider_doc(
     provider["base_url"] = toml_edit::value(base_url);
     provider["wire_api"] = toml_edit::value("responses");
     provider["requires_openai_auth"] = toml_edit::value(true);
+    if preserve_chatgpt_auth {
+        provider["experimental_bearer_token"] = toml_edit::value(api_key);
+    }
     doc["model_providers"][provider_id] = Item::Table(provider);
+
+    if enable_builtin_plugins {
+        if !doc.as_table().contains_key("plugins") {
+            doc["plugins"] = Item::Table(Table::new());
+        }
+        if let Some(plugins) = doc
+            .get_mut("plugins")
+            .and_then(|item| item.as_table_like_mut())
+        {
+            for (plugin_id, _) in CODEX_BUILTIN_PLUGINS {
+                enable_codex_plugin(plugins, plugin_id);
+            }
+        }
+    }
+}
+
+fn enable_codex_plugin(plugins: &mut dyn toml_edit::TableLike, plugin_id: &str) {
+    if let Some(plugin) = plugins
+        .get_mut(plugin_id)
+        .and_then(|item| item.as_table_like_mut())
+    {
+        plugin.insert("enabled", toml_edit::value(true));
+    } else {
+        let mut plugin = Table::new();
+        plugin["enabled"] = toml_edit::value(true);
+        plugins.insert(plugin_id, Item::Table(plugin));
+    }
+}
+
+fn cleanup_codex_config_doc(doc: &mut DocumentMut, provider_id: &str) -> bool {
+    let mut changed = false;
+    let provider_ids = cleanup_provider_ids(provider_id);
+    let active_is_managed = doc
+        .get("model_provider")
+        .and_then(|item| item.as_str())
+        .map(|current| provider_ids.iter().any(|id| id == current))
+        .unwrap_or(false);
+
+    if let Some(current) = doc.get("model_provider").and_then(|item| item.as_str()) {
+        if provider_ids.iter().any(|id| id == current) {
+            doc.as_table_mut().remove("model_provider");
+            changed = true;
+        }
+    }
+
+    if active_is_managed {
+        if doc.as_table_mut().remove("model").is_some() {
+            changed = true;
+        }
+        if doc.as_table_mut().remove("model_reasoning_effort").is_some() {
+            changed = true;
+        }
+        if doc.as_table_mut().remove("disable_response_storage").is_some() {
+            changed = true;
+        }
+    }
+
+    if let Some(providers) = doc
+        .get_mut("model_providers")
+        .and_then(|item| item.as_table_like_mut())
+    {
+        for id in &provider_ids {
+            if providers.remove(id).is_some() {
+                changed = true;
+            }
+        }
+    }
+
+    if let Some(plugins) = doc
+        .get_mut("plugins")
+        .and_then(|item| item.as_table_like_mut())
+    {
+        for (plugin_id, _) in CODEX_BUILTIN_PLUGINS {
+            if plugins.remove(plugin_id).is_some() {
+                changed = true;
+            }
+        }
+    }
+
+    changed
+}
+
+fn cleanup_provider_ids(provider_id: &str) -> Vec<String> {
+    let mut ids = vec![provider_id.to_string()];
+    for legacy in [DEFAULT_CODEX_PROVIDER_ID, LEGACY_CODEX_PROVIDER_ID] {
+        if !ids.iter().any(|id| id == legacy) {
+            ids.push(legacy.to_string());
+        }
+    }
+    ids
 }
 
 fn write_codex_live_atomic(
@@ -435,6 +621,9 @@ model = "gpt-4"
             "https://new.example/v1",
             "gpt-5.4",
             "high",
+            "sk-test",
+            false,
+            false,
         );
         let parsed: toml_edit::DocumentMut = doc.to_string().parse().expect("valid output");
 
@@ -481,6 +670,9 @@ wire_api = "responses"
             "https://new.example/v1",
             "gpt-5.4",
             "high",
+            "sk-test",
+            false,
+            false,
         );
 
         let parsed: DocumentMut = doc.to_string().parse().expect("valid output");
@@ -491,5 +683,135 @@ wire_api = "responses"
         assert!(providers.get("switchboard").is_none());
         assert!(providers.get("haloforge_gateway").is_some());
         assert!(providers.get("other").is_some());
+    }
+
+    #[test]
+    fn codex_provider_can_enable_chrome_plugin_and_bearer_token() {
+        let mut doc = r#"model_provider = "old"
+
+[plugins."browser@openai-bundled"]
+enabled = true
+"#
+        .parse::<DocumentMut>()
+        .expect("valid toml");
+
+        apply_codex_provider_doc(
+            &mut doc,
+            "third_party",
+            "Third Party",
+            "https://new.example/v1",
+            "gpt-5.5",
+            "high",
+            "sk-third-party",
+            true,
+            true,
+        );
+
+        let parsed: DocumentMut = doc.to_string().parse().expect("valid output");
+        assert_eq!(
+            parsed
+                .get("model_providers")
+                .and_then(|item| item.as_table())
+                .and_then(|table| table.get("third_party"))
+                .and_then(|item| item.as_table())
+                .and_then(|table| table.get("experimental_bearer_token"))
+                .and_then(|item| item.as_str()),
+            Some("sk-third-party")
+        );
+        assert_eq!(
+            parsed
+                .get("plugins")
+                .and_then(|item| item.as_table())
+                .and_then(|table| table.get("chrome@openai-bundled"))
+                .and_then(|item| item.as_table())
+                .and_then(|table| table.get("enabled"))
+                .and_then(|item| item.as_bool()),
+            Some(true)
+        );
+        assert!(parsed
+            .get("plugins")
+            .and_then(|item| item.as_table())
+            .and_then(|table| table.get("browser@openai-bundled"))
+            .is_some());
+    }
+
+    #[test]
+    fn codex_cleanup_removes_managed_custom_api_without_touching_mcp() {
+        let mut doc = r#"model_provider = "haloforge_gateway"
+model = "gpt-5.5"
+model_reasoning_effort = "high"
+disable_response_storage = true
+
+[model_providers.haloforge_gateway]
+name = "HaloForge Gateway"
+base_url = "https://new.example/v1"
+wire_api = "responses"
+requires_openai_auth = true
+experimental_bearer_token = "sk-test"
+
+[plugins."chrome@openai-bundled"]
+enabled = true
+
+[mcp_servers.context7]
+type = "stdio"
+command = "npx"
+
+[profiles.work]
+model_provider = "other"
+"#
+        .parse::<DocumentMut>()
+        .expect("valid toml");
+
+        assert!(cleanup_codex_config_doc(&mut doc, "haloforge_gateway"));
+        let parsed: DocumentMut = doc.to_string().parse().expect("valid output");
+        assert!(parsed.get("model_provider").is_none());
+        assert!(parsed.get("model").is_none());
+        assert!(parsed
+            .get("model_providers")
+            .and_then(|item| item.as_table())
+            .and_then(|table| table.get("haloforge_gateway"))
+            .is_none());
+        assert!(parsed
+            .get("plugins")
+            .and_then(|item| item.as_table())
+            .and_then(|table| table.get("chrome@openai-bundled"))
+            .is_none());
+        assert!(parsed.get("mcp_servers").is_some());
+        assert!(parsed.get("profiles").is_some());
+    }
+
+    #[test]
+    fn codex_cleanup_preserves_unmanaged_active_model_settings() {
+        let mut doc = r#"model_provider = "other"
+model = "gpt-4"
+
+[model_providers.haloforge_gateway]
+name = "HaloForge Gateway"
+base_url = "https://new.example/v1"
+
+[model_providers.other]
+name = "Other"
+base_url = "https://other.example/v1"
+"#
+        .parse::<DocumentMut>()
+        .expect("valid toml");
+
+        assert!(cleanup_codex_config_doc(&mut doc, "haloforge_gateway"));
+        let parsed: DocumentMut = doc.to_string().parse().expect("valid output");
+        assert_eq!(
+            parsed.get("model_provider").and_then(|item| item.as_str()),
+            Some("other")
+        );
+        assert_eq!(parsed.get("model").and_then(|item| item.as_str()), Some("gpt-4"));
+        assert!(parsed
+            .get("model_providers")
+            .and_then(|item| item.as_table())
+            .and_then(|table| table.get("haloforge_gateway"))
+            .is_none());
+        assert!(parsed
+            .get("model_providers")
+            .and_then(|item| item.as_table())
+            .and_then(|table| table.get("other"))
+            .is_some());
     }
 }

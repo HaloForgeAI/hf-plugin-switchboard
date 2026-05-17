@@ -69,9 +69,15 @@ export interface ProviderForm {
   opusModel: string;
   setClaudePrimaryApiKey: boolean;
   skipClaudeOnboarding: boolean;
+  enableCodexBuiltinPlugins: boolean;
+  preserveCodexChatgptAuth: boolean;
 }
 
 export type SetProviderForm = Dispatch<SetStateAction<ProviderForm>>;
+
+export interface CleanupCodexForm {
+  providerId: string;
+}
 
 export interface McpAppSelection {
   claude: boolean;

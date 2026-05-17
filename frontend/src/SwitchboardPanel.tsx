@@ -38,6 +38,7 @@ export function SwitchboardPanel() {
     refresh,
     applyProvider,
     installMcp,
+    cleanupCodex,
     discoverModels,
     restoreBackup,
   } = useSwitchboard();
@@ -177,6 +178,7 @@ export function SwitchboardPanel() {
             setForm={setCodexForm}
             busy={busy}
             onApply={() => void applyProvider(codexForm)}
+            onCleanupCodex={() => void cleanupCodex({ providerId: codexForm.providerId })}
             onDiscoverModels={() => discoverModels(codexForm)}
             t={t}
           />

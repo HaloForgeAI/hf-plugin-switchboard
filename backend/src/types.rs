@@ -81,6 +81,9 @@ pub struct ApplyProviderArgs {
     pub opus_model: Option<String>,
     pub set_claude_primary_api_key: Option<bool>,
     pub skip_claude_onboarding: Option<bool>,
+    #[serde(alias = "enableCodexChromePlugin")]
+    pub enable_codex_builtin_plugins: Option<bool>,
+    pub preserve_codex_chatgpt_auth: Option<bool>,
 }
 
 #[derive(Debug, Serialize)]
@@ -101,6 +104,19 @@ pub struct RestoreBackupArgs {
 #[serde(rename_all = "camelCase")]
 pub struct RestoreBackupResult {
     pub restored_paths: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CleanupCodexArgs {
+    pub provider_id: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CleanupCodexResult {
+    pub backup: BackupInfo,
+    pub changed_paths: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]

@@ -1,8 +1,8 @@
 use crate::fs_util::{display_path, pathbufs_to_strings};
 use crate::paths::SwitchboardPaths;
 use crate::types::{
-    ApplyProviderArgs, ApplyProviderResult, DiscoverModelsArgs, InstallMcpArgs, InstallMcpResult,
-    RestoreBackupArgs, RestoreBackupResult,
+    ApplyProviderArgs, ApplyProviderResult, CleanupCodexArgs, CleanupCodexResult,
+    DiscoverModelsArgs, InstallMcpArgs, InstallMcpResult, RestoreBackupArgs, RestoreBackupResult,
 };
 use crate::{backup, mcp, provider, status};
 use hf_plugin_api::{PluginContext, PluginError};
@@ -75,6 +75,21 @@ pub fn switchboard_restore_backup(
 
     to_value(RestoreBackupResult {
         restored_paths: restored,
+    })
+}
+
+pub fn switchboard_cleanup_codex(
+    args: Value,
+    ctx: &dyn PluginContext,
+) -> Result<Value, PluginError> {
+    let args: CleanupCodexArgs = parse_args(args)?;
+    let paths = SwitchboardPaths::resolve()?;
+    let backup = backup::create_backup(ctx, provider::codex_cleanup_backup_paths(&paths))?;
+    let touched = provider::cleanup_codex_custom_api(&paths, &args)?;
+
+    to_value(CleanupCodexResult {
+        backup,
+        changed_paths: pathbufs_to_strings(&touched),
     })
 }
 

@@ -1,7 +1,7 @@
 import { invokePlugin } from "@haloforge/plugin-sdk";
 import { useCallback, useEffect, useState } from "react";
 import { useSwitchboardT } from "../i18n";
-import type { BackupInfo, McpAppSelection, ProviderForm, SwitchboardStatus } from "../types";
+import type { BackupInfo, CleanupCodexForm, McpAppSelection, ProviderForm, SwitchboardStatus } from "../types";
 
 export function useSwitchboard() {
   const t = useSwitchboardT();
@@ -66,6 +66,29 @@ export function useSwitchboard() {
     [refresh, t],
   );
 
+  const cleanupCodex = useCallback(
+    async (form: CleanupCodexForm) => {
+      setBusy("cleanup-codex");
+      setMessage(null);
+      try {
+        const result = await invokePlugin<{ changedPaths: string[]; backup: BackupInfo }>(
+          "switchboard_cleanup_codex",
+          { ...form },
+        );
+        setMessage(t("switchboard.message.codexCleaned", {
+          count: result.changedPaths.length,
+          backupId: result.backup.id,
+        }));
+        await refresh();
+      } catch (error) {
+        setMessage(formatError(error));
+      } finally {
+        setBusy(null);
+      }
+    },
+    [refresh, t],
+  );
+
   const discoverModels = useCallback(
     async (form: Pick<ProviderForm, "baseUrl" | "apiKey" | "modelsPath">) => {
       setBusy("models");
@@ -119,6 +142,7 @@ export function useSwitchboard() {
     refresh,
     applyProvider,
     installMcp,
+    cleanupCodex,
     discoverModels,
     restoreBackup,
   };

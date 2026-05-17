@@ -406,11 +406,42 @@
   gap: 12px;
 }
 
+.sb-options-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .sb-checkbox-group label,
 .sb-options label {
   display: inline-flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
+}
+
+.sb-options-cards label {
+  min-width: 0;
+  border: 1px solid var(--color-border, #d9dee7);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-background, #f7f8fb) 78%, transparent);
+  padding: 11px;
+}
+
+.sb-options-cards span {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.sb-options-cards strong {
+  color: var(--color-foreground, #15171a);
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.sb-options-cards small {
+  color: color-mix(in srgb, var(--color-foreground, #15171a) 62%, transparent);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .sb-checkbox-group input,
@@ -488,6 +519,8 @@
 
 .sb-actions {
   display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
   justify-content: flex-end;
 }
 
@@ -513,6 +546,17 @@
   border-color: var(--color-border, #d9dee7);
   background: var(--color-surface, #ffffff);
   color: var(--color-foreground, #15171a);
+}
+
+.sb-danger-button {
+  border-color: color-mix(in srgb, #dc2626 28%, var(--color-border, #d9dee7));
+  color: #b91c1c;
+}
+
+.sb-danger-button:hover {
+  border-color: rgba(220, 38, 38, 0.42);
+  background: rgba(220, 38, 38, 0.08);
+  color: #991b1b;
 }
 
 .sb-icon-button {

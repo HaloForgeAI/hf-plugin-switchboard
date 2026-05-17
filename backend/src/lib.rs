@@ -58,6 +58,10 @@ impl HaloForgePlugin for SwitchboardPlugin {
             Box::new(commands::switchboard_restore_backup),
         )?;
         ipc.register(
+            "switchboard_cleanup_codex",
+            Box::new(commands::switchboard_cleanup_codex),
+        )?;
+        ipc.register(
             "switchboard_install_mcp",
             Box::new(commands::switchboard_install_mcp),
         )?;

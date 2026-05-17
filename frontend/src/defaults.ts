@@ -24,5 +24,7 @@ export function defaultProviderForm(settings: PluginSettings): ProviderForm {
     opusModel: "",
     setClaudePrimaryApiKey: false,
     skipClaudeOnboarding: true,
+    enableCodexBuiltinPlugins: true,
+    preserveCodexChatgptAuth: false,
   };
 }

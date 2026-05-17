@@ -11,6 +11,7 @@ interface ProviderPanelProps {
   setForm: SetProviderForm;
   busy: string | null;
   onApply: () => void;
+  onCleanupCodex?: () => void;
   onDiscoverModels: () => Promise<string[]>;
   t: (key: SwitchboardTranslationKey, vars?: Record<string, string | number>) => string;
 }
@@ -22,6 +23,7 @@ export function ProviderPanel({
   setForm,
   busy,
   onApply,
+  onCleanupCodex,
   onDiscoverModels,
   t,
 }: ProviderPanelProps) {
@@ -182,32 +184,68 @@ export function ProviderPanel({
               </div>
             </>
           ) : (
-            <div className="sb-form-grid">
-              <label>
-                <span>{t("switchboard.provider.providerId")}</span>
-                <input
-                  value={form.providerId}
-                  onChange={(event) => updateForm(setForm, { providerId: event.target.value })}
-                  spellCheck={false}
-                />
-              </label>
-              <label>
-                <span>{t("switchboard.provider.reasoning")}</span>
-                <AppSelect
-                  value={form.reasoningEffort}
-                  onChange={(event) => updateForm(setForm, { reasoningEffort: event.target.value })}
-                >
-                  <option value="high">{t("switchboard.provider.reasoning.high")}</option>
-                  <option value="medium">{t("switchboard.provider.reasoning.medium")}</option>
-                  <option value="low">{t("switchboard.provider.reasoning.low")}</option>
-                </AppSelect>
-              </label>
-            </div>
+            <>
+              <div className="sb-form-grid">
+                <label>
+                  <span>{t("switchboard.provider.providerId")}</span>
+                  <input
+                    value={form.providerId}
+                    onChange={(event) => updateForm(setForm, { providerId: event.target.value })}
+                    spellCheck={false}
+                  />
+                </label>
+                <label>
+                  <span>{t("switchboard.provider.reasoning")}</span>
+                  <AppSelect
+                    value={form.reasoningEffort}
+                    onChange={(event) => updateForm(setForm, { reasoningEffort: event.target.value })}
+                  >
+                    <option value="high">{t("switchboard.provider.reasoning.high")}</option>
+                    <option value="medium">{t("switchboard.provider.reasoning.medium")}</option>
+                    <option value="low">{t("switchboard.provider.reasoning.low")}</option>
+                  </AppSelect>
+                </label>
+              </div>
+              <div className="sb-options sb-options-cards">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={form.enableCodexBuiltinPlugins}
+                    onChange={(event) => updateForm(setForm, { enableCodexBuiltinPlugins: event.target.checked })}
+                  />
+                  <span>
+                    <strong>{t("switchboard.provider.enableBuiltinPlugins")}</strong>
+                    <small>{t("switchboard.provider.enableBuiltinPluginsHint")}</small>
+                  </span>
+                </label>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={form.preserveCodexChatgptAuth}
+                    onChange={(event) => updateForm(setForm, { preserveCodexChatgptAuth: event.target.checked })}
+                  />
+                  <span>
+                    <strong>{t("switchboard.provider.preserveChatgptAuth")}</strong>
+                    <small>{t("switchboard.provider.preserveChatgptAuthHint")}</small>
+                  </span>
+                </label>
+              </div>
+            </>
           )}
         </div>
       </details>
 
       <div className="sb-actions">
+        {!isClaude && onCleanupCodex && (
+          <button
+            type="button"
+            className="sb-secondary-button sb-danger-button"
+            disabled={busy === "cleanup-codex" || busy === "provider"}
+            onClick={onCleanupCodex}
+          >
+            {t("switchboard.provider.cleanupCodex")}
+          </button>
+        )}
         <button type="button" className="sb-primary-button" disabled={busy === "provider"} onClick={onApply}>
           {isClaude ? <Settings2 size={16} /> : <CheckCircle2 size={16} />}
           {isClaude ? t("switchboard.provider.applyClaude") : t("switchboard.provider.applyCodex")}

@@ -10,6 +10,16 @@ use std::fs;
 use std::path::Path;
 use toml_edit::DocumentMut;
 
+const CODEX_BUILTIN_PLUGINS: &[(&str, &str)] = &[
+    ("browser@openai-bundled", "Browser"),
+    ("chrome@openai-bundled", "Chrome"),
+    ("computer-use@openai-bundled", "Computer Use"),
+    ("documents@openai-primary-runtime", "Documents"),
+    ("spreadsheets@openai-primary-runtime", "Spreadsheets"),
+    ("presentations@openai-primary-runtime", "Presentations"),
+    ("github@openai-curated", "GitHub"),
+];
+
 pub fn read_status(ctx: &dyn PluginContext) -> Result<SwitchboardStatus, PluginError> {
     let paths = SwitchboardPaths::resolve()?;
     Ok(SwitchboardStatus {
@@ -95,6 +105,16 @@ fn codex_status(paths: &SwitchboardPaths) -> TargetStatus {
                 {
                     push_detail(&mut details, "Provider name", Some(name), None);
                 }
+                if let Some(token) = doc
+                    .get("model_providers")
+                    .and_then(|item| item.as_table())
+                    .and_then(|table| table.get(provider))
+                    .and_then(|item| item.as_table())
+                    .and_then(|table| table.get("experimental_bearer_token"))
+                    .and_then(|item| item.as_str())
+                {
+                    push_detail(&mut details, "Bearer token", Some(&mask_secret(token)), Some(token));
+                }
             }
             if let Some(model) = doc.get("model").and_then(|item| item.as_str()) {
                 parts.push(model.to_string());
@@ -105,6 +125,10 @@ fn codex_status(paths: &SwitchboardPaths) -> TargetStatus {
                 .and_then(|item| item.as_str())
             {
                 push_detail(&mut details, "Reasoning", Some(reasoning), None);
+            }
+            let enabled_plugins = enabled_codex_builtin_plugins(&doc);
+            if !enabled_plugins.is_empty() {
+                push_detail(&mut details, "Built-in plugins", Some(&enabled_plugins.join(", ")), None);
             }
         }
     }
@@ -120,6 +144,24 @@ fn codex_status(paths: &SwitchboardPaths) -> TargetStatus {
             path_status("config", &paths.codex_config_path),
         ],
     }
+}
+
+fn enabled_codex_builtin_plugins(doc: &DocumentMut) -> Vec<&'static str> {
+    let Some(plugins) = doc.get("plugins").and_then(|item| item.as_table()) else {
+        return Vec::new();
+    };
+    CODEX_BUILTIN_PLUGINS
+        .iter()
+        .filter_map(|(plugin_id, label)| {
+            let enabled = plugins
+                .get(plugin_id)
+                .and_then(|item| item.as_table())
+                .and_then(|table| table.get("enabled"))
+                .and_then(|item| item.as_bool())
+                .unwrap_or(false);
+            enabled.then_some(*label)
+        })
+        .collect()
 }
 
 fn push_detail(
