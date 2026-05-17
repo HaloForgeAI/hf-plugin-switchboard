@@ -14,7 +14,7 @@ The first release focuses on safe local writes: every apply/install operation cr
 
 - HaloForge Level 0 module plugin
 - Rust backend built with `haloforge-plugin-api` `0.2.5`
-- React frontend built with `@haloforge/plugin-sdk` `0.2.5`
+- React frontend built with `@haloforge/plugin-sdk` `0.2.8`
 - Claude Code provider writes with `ANTHROPIC_BASE_URL`, token, and model env vars
 - Optional Claude `primaryApiKey` and onboarding flags used by switch workflows
 - Codex provider writes that preserve existing `config.toml` sections such as `[mcp_servers]` and `[profiles]`
@@ -83,7 +83,7 @@ Install the packaged plugin into a local HaloForge workspace with the `hf` CLI:
 
 ```bash
 cd /path/to/HaloForge
-npm run hf -- plugin install local /path/to/hf-plugin-switchboard/dist/package/dev.haloforge.switchboard-0.1.3.hfpkg --json
+npm run hf -- plugin install local /path/to/hf-plugin-switchboard/dist/package/dev.haloforge.switchboard-0.1.4.hfpkg --json
 npm run hf -- plugin list --json
 ```
 

@@ -31,7 +31,7 @@ impl HaloForgePlugin for SwitchboardPlugin {
         PluginMetadata {
             id: "dev.haloforge.switchboard".into(),
             name: "Switchboard".into(),
-            version: "0.1.2".into(),
+            version: "0.1.4".into(),
             description: "Fast local configuration switching for Claude Code, Codex, and MCP."
                 .into(),
             author: "HaloForge Team".into(),
