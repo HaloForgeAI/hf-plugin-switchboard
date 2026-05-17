@@ -15,7 +15,7 @@
     "min_host_api_version": "0.1.0",
     "platforms": ["windows", "macos", "linux"]
   },
-  "host_capabilities": ["navigation", "theme_read", "event_subscribe"],
+  "host_capabilities": ["navigation", "theme_read", "event_subscribe", "deep_links"],
   "capability_levels": [0],
   "integration": {
     "level0": {
@@ -45,7 +45,8 @@
     { "type": "filesystem_write" },
     { "type": "host_navigation" },
     { "type": "host_theme_read" },
-    { "type": "host_event_subscribe" }
+    { "type": "host_event_subscribe" },
+    { "type": "host_deep_links" }
   ],
   "settings_schema": {
     "type": "object",

@@ -8,7 +8,7 @@
     "dev": "vite build --watch"
   },
   "dependencies": {
-    "@haloforge/plugin-sdk": "^0.2.8",
+    "@haloforge/plugin-sdk": "^0.2.9",
     "@tauri-apps/api": "^2.0.0",
     "lucide-react": "^0.500.0"
   },

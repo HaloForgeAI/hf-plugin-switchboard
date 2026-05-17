@@ -89,3 +89,22 @@ export interface McpImportPatch {
   apps: McpAppSelection;
   specText: string;
 }
+
+export interface SwitchboardImportPatch {
+  tab?: "claude" | "codex" | "mcp" | "backups" | "overview";
+  provider?: Partial<Pick<
+    ProviderForm,
+    | "target"
+    | "name"
+    | "baseUrl"
+    | "apiKey"
+    | "modelsPath"
+    | "providerId"
+    | "model"
+    | "reasoningEffort"
+    | "haikuModel"
+    | "sonnetModel"
+    | "opusModel"
+  >>;
+  mcp?: Partial<McpImportPatch>;
+}

@@ -13,8 +13,8 @@ The first release focuses on safe local writes: every apply/install operation cr
 ## Implemented
 
 - HaloForge Level 0 module plugin
-- Rust backend built with `haloforge-plugin-api` `0.2.5`
-- React frontend built with `@haloforge/plugin-sdk` `0.2.8`
+- Rust backend built with `haloforge-plugin-api` `0.2.9`
+- React frontend built with `@haloforge/plugin-sdk` `0.2.9`
 - Claude Code provider writes with `ANTHROPIC_BASE_URL`, token, and model env vars
 - Optional Claude `primaryApiKey` and onboarding flags used by switch workflows
 - Codex provider writes that preserve existing `config.toml` sections such as `[mcp_servers]` and `[profiles]`

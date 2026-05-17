@@ -1,6 +1,6 @@
-import { usePluginSettings } from "@haloforge/plugin-sdk";
+import { clearPendingPluginDeepLink, usePluginDeepLink, usePluginSettings } from "@haloforge/plugin-sdk";
 import { Bot, Braces, LayoutDashboard, RefreshCcw, Shield, TerminalSquare } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { BackupPanel } from "./components/BackupPanel";
 import { McpPanel } from "./components/McpPanel";
 import { ProviderPanel } from "./components/ProviderPanel";
@@ -8,7 +8,7 @@ import { TargetCard } from "./components/TargetCard";
 import { DEFAULT_CODEX_PROVIDER_ID, DEFAULT_MCP_SPEC, defaultProviderForm } from "./defaults";
 import { useSwitchboardT } from "./i18n";
 import { useSwitchboard } from "./hooks/useSwitchboard";
-import type { McpAppSelection, PluginSettings, ProviderForm, TargetStatus } from "./types";
+import type { McpAppSelection, PluginSettings, ProviderForm, SwitchboardImportPatch } from "./types";
 
 type SwitchboardTab = "overview" | "claude" | "codex" | "mcp" | "backups";
 
@@ -42,6 +42,50 @@ export function SwitchboardPanel() {
     discoverModels,
     restoreBackup,
   } = useSwitchboard();
+
+  const applyImportPatch = useCallback((patch: SwitchboardImportPatch) => {
+    const providerPatch = normalizeProviderPatch(patch.provider);
+    if (providerPatch) {
+      const target = providerPatch.target ?? settings.defaultTarget ?? "both";
+      if (target === "codex") {
+        setCodexForm((current) => ({ ...current, ...providerPatch, target: "codex" }));
+      } else if (target === "both") {
+        setClaudeForm((current) => ({ ...current, ...providerPatch, target: "claude" }));
+        setCodexForm((current) => ({ ...current, ...providerPatch, target: "codex" }));
+      } else {
+        setClaudeForm((current) => ({ ...current, ...providerPatch, target: "claude" }));
+      }
+    }
+
+    if (patch.mcp) {
+      if (typeof patch.mcp.id === "string" && patch.mcp.id.trim()) {
+        setMcpId(patch.mcp.id.trim());
+      }
+      if (patch.mcp.apps) {
+        const apps = patch.mcp.apps;
+        setMcpApps((current) => ({ ...current, ...apps }));
+      }
+      if (typeof patch.mcp.specText === "string" && patch.mcp.specText.trim()) {
+        setMcpSpec(patch.mcp.specText);
+      }
+    }
+
+    setActiveTab(resolveImportTab(patch, providerPatch, settings.defaultTarget ?? "both"));
+    setMessage(t("switchboard.message.importReady"));
+  }, [setMessage, settings.defaultTarget, t]);
+
+  usePluginDeepLink(useCallback((link) => {
+    if (link.route !== "/v1/import" && link.route !== "/import") {
+      return;
+    }
+    const patch = parseImportPatch(link.params);
+    if (!patch) {
+      setMessage(t("switchboard.message.importInvalid"));
+      return;
+    }
+    applyImportPatch(patch);
+    clearPendingPluginDeepLink();
+  }, [applyImportPatch, setMessage, t]));
 
   useEffect(() => {
     setClaudeForm((current) => ({
@@ -208,4 +252,121 @@ export function SwitchboardPanel() {
       )}
     </main>
   );
+}
+
+function resolveImportTab(
+  patch: SwitchboardImportPatch,
+  providerPatch: SwitchboardImportPatch["provider"] | null,
+  defaultTarget: ProviderForm["target"],
+): SwitchboardTab {
+  if (patch.tab) {
+    return patch.tab;
+  }
+  if (patch.mcp && !providerPatch) {
+    return "mcp";
+  }
+  if ((providerPatch?.target ?? defaultTarget) === "codex") {
+    return "codex";
+  }
+  return providerPatch ? "claude" : "overview";
+}
+
+function normalizeProviderPatch(
+  value: SwitchboardImportPatch["provider"],
+): SwitchboardImportPatch["provider"] | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const patch: SwitchboardImportPatch["provider"] = {};
+  const target = value.target;
+  if (target === "claude" || target === "codex" || target === "both") {
+    patch.target = target;
+  }
+  for (const key of ["name", "baseUrl", "apiKey", "modelsPath", "providerId", "model", "reasoningEffort", "haikuModel", "sonnetModel", "opusModel"] as const) {
+    if (typeof value[key] === "string") {
+      patch[key] = value[key];
+    }
+  }
+  return Object.keys(patch).length > 0 ? patch : null;
+}
+
+function parseImportPatch(params: Record<string, string>): SwitchboardImportPatch | null {
+  const encoded = params.payload ?? params.data ?? params.config;
+  if (encoded) {
+    const parsed = parseJsonPayload(encoded);
+    if (parsed) {
+      return parsed;
+    }
+  }
+
+  const patch: SwitchboardImportPatch = {};
+  const tab = params.tab;
+  if (tab === "claude" || tab === "codex" || tab === "mcp" || tab === "backups" || tab === "overview") {
+    patch.tab = tab;
+  }
+
+  const provider = normalizeProviderPatch({
+    target: params.target,
+    name: params.name,
+    baseUrl: params.baseUrl ?? params.base_url,
+    apiKey: params.apiKey ?? params.api_key,
+    modelsPath: params.modelsPath ?? params.models_path,
+    providerId: params.providerId ?? params.provider_id,
+    model: params.model,
+    reasoningEffort: params.reasoningEffort ?? params.reasoning_effort,
+    haikuModel: params.haikuModel ?? params.haiku_model,
+    sonnetModel: params.sonnetModel ?? params.sonnet_model,
+    opusModel: params.opusModel ?? params.opus_model,
+  });
+  if (provider) {
+    patch.provider = provider;
+  }
+
+  const mcpSpecText = params.mcpSpec ?? params.mcp_spec ?? params.spec;
+  const mcpId = params.mcpId ?? params.mcp_id;
+  if (mcpId || mcpSpecText) {
+    patch.mcp = {
+      id: mcpId,
+      specText: mcpSpecText,
+      apps: {
+        claude: parseBooleanParam(params.claude, true),
+        codex: parseBooleanParam(params.codex, true),
+      },
+    };
+  }
+
+  return patch.provider || patch.mcp || patch.tab ? patch : null;
+}
+
+function parseJsonPayload(value: string): SwitchboardImportPatch | null {
+  for (const candidate of [value, decodeBase64Url(value)]) {
+    if (!candidate) {
+      continue;
+    }
+    try {
+      const parsed = JSON.parse(candidate) as SwitchboardImportPatch;
+      return parsed && typeof parsed === "object" ? parsed : null;
+    } catch {
+      // Try the next encoding.
+    }
+  }
+  return null;
+}
+
+function decodeBase64Url(value: string): string | null {
+  try {
+    const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+    const bytes = Uint8Array.from(window.atob(padded), (char) => char.charCodeAt(0));
+    return new TextDecoder().decode(bytes);
+  } catch {
+    return null;
+  }
+}
+
+function parseBooleanParam(value: string | undefined, fallback: boolean): boolean {
+  if (value === undefined) {
+    return fallback;
+  }
+  return value === "1" || value.toLowerCase() === "true" || value.toLowerCase() === "yes";
 }
