@@ -1,16 +1,21 @@
-import { clearPendingPluginDeepLink, usePluginDeepLink, usePluginSettings } from "@haloforge/plugin-sdk";
-import { Bot, Braces, LayoutDashboard, RefreshCcw, Shield, TerminalSquare } from "lucide-react";
+import { clearPendingPluginDeepLink, usePluginDeepLink, usePluginSettings, type PluginDeepLink } from "@haloforge/plugin-sdk";
+import { Bot, Braces, CheckCircle2, KeyRound, LayoutDashboard, RefreshCcw, Shield, TerminalSquare, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { BackupPanel } from "./components/BackupPanel";
 import { McpPanel } from "./components/McpPanel";
 import { ProviderPanel } from "./components/ProviderPanel";
 import { TargetCard } from "./components/TargetCard";
 import { DEFAULT_CODEX_PROVIDER_ID, DEFAULT_MCP_SPEC, defaultProviderForm } from "./defaults";
-import { useSwitchboardT } from "./i18n";
+import { useSwitchboardT, type SwitchboardTranslationKey } from "./i18n";
 import { useSwitchboard } from "./hooks/useSwitchboard";
 import type { McpAppSelection, PluginSettings, ProviderForm, SwitchboardImportPatch } from "./types";
 
 type SwitchboardTab = "overview" | "claude" | "codex" | "mcp" | "backups";
+
+interface PendingImport {
+  patch: SwitchboardImportPatch;
+  providerPatch: SwitchboardImportPatch["provider"] | null;
+}
 
 function buildProviderForm(settings: PluginSettings, target: ProviderForm["target"]): ProviderForm {
   return {
@@ -31,6 +36,7 @@ export function SwitchboardPanel() {
     codex: true,
   });
   const [mcpSpec, setMcpSpec] = useState(DEFAULT_MCP_SPEC);
+  const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
   const {
     status,
     busy,
@@ -75,7 +81,7 @@ export function SwitchboardPanel() {
     setMessage(t("switchboard.message.importReady"));
   }, [setMessage, settings.defaultTarget, t]);
 
-  usePluginDeepLink(useCallback((link) => {
+  usePluginDeepLink(useCallback((link: PluginDeepLink) => {
     if (link.route !== "/v1/import" && link.route !== "/import") {
       return;
     }
@@ -84,9 +90,25 @@ export function SwitchboardPanel() {
       setMessage(t("switchboard.message.importInvalid"));
       return;
     }
-    applyImportPatch(patch);
+    const providerPatch = normalizeProviderPatch(patch.provider);
+    const targetTab = resolveImportTab(patch, providerPatch, settings.defaultTarget ?? "both");
+    setActiveTab(targetTab);
+    setPendingImport({ patch, providerPatch });
+    setMessage(null);
     clearPendingPluginDeepLink();
-  }, [applyImportPatch, setMessage, t]));
+  }, [setMessage, settings.defaultTarget, t]));
+
+  const confirmPendingImport = useCallback(() => {
+    if (!pendingImport) {
+      return;
+    }
+    applyImportPatch(pendingImport.patch);
+    setPendingImport(null);
+  }, [applyImportPatch, pendingImport]);
+
+  const cancelPendingImport = useCallback(() => {
+    setPendingImport(null);
+  }, []);
 
   useEffect(() => {
     setClaudeForm((current) => ({
@@ -251,8 +273,165 @@ export function SwitchboardPanel() {
           <BackupPanel backups={status?.backups ?? []} busy={busy} onRestore={(id) => void restoreBackup(id)} t={t} />
         </section>
       )}
+
+      {pendingImport && (
+        <ImportPreviewDialog
+          pendingImport={pendingImport}
+          defaultTarget={settings.defaultTarget ?? "both"}
+          onCancel={cancelPendingImport}
+          onConfirm={confirmPendingImport}
+          t={t}
+        />
+      )}
     </main>
   );
+}
+
+interface ImportPreviewDialogProps {
+  pendingImport: PendingImport;
+  defaultTarget: ProviderForm["target"];
+  onCancel: () => void;
+  onConfirm: () => void;
+  t: (key: SwitchboardTranslationKey, vars?: Record<string, string | number>) => string;
+}
+
+function ImportPreviewDialog({
+  pendingImport,
+  defaultTarget,
+  onCancel,
+  onConfirm,
+  t,
+}: ImportPreviewDialogProps) {
+  const { patch, providerPatch } = pendingImport;
+  const target = providerPatch?.target ?? defaultTarget;
+  const targetLabel = target === "codex"
+    ? t("switchboard.tab.codex")
+    : target === "claude"
+      ? t("switchboard.tab.claude")
+      : t("switchboard.import.targetBoth");
+  const providerRows = buildImportProviderRows(providerPatch, t);
+  const hasMcp = Boolean(patch.mcp);
+  const mcpTargets = patch.mcp?.apps
+    ? [
+        patch.mcp.apps.claude ? t("switchboard.tab.claude") : null,
+        patch.mcp.apps.codex ? t("switchboard.tab.codex") : null,
+      ].filter(Boolean).join(", ")
+    : t("switchboard.import.targetBoth");
+
+  return (
+    <div className="sb-modal-backdrop" role="presentation">
+      <section
+        aria-labelledby="switchboard-import-title"
+        aria-modal="true"
+        className="sb-import-dialog"
+        role="dialog"
+      >
+        <div className="sb-import-head">
+          <div className="sb-import-title-row">
+            <span className="sb-import-icon" aria-hidden="true">
+              <KeyRound size={18} />
+            </span>
+            <div>
+              <h2 id="switchboard-import-title">{t("switchboard.import.title")}</h2>
+              <p>{t("switchboard.import.subtitle", { target: targetLabel })}</p>
+            </div>
+          </div>
+          <button className="sb-mini-icon-button" type="button" onClick={onCancel} title={t("switchboard.import.cancel")}>
+            <X size={14} />
+          </button>
+        </div>
+
+        {providerPatch && (
+          <div className="sb-import-section">
+            <div className="sb-import-section-head">
+              <strong>{t("switchboard.import.providerTitle")}</strong>
+              <span className="sb-status-chip sb-status-chip-on">{targetLabel}</span>
+            </div>
+            <div className="sb-import-grid">
+              {providerRows.map((row) => (
+                <div className="sb-import-row" key={row.label}>
+                  <span>{row.label}</span>
+                  <code>{row.value}</code>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {hasMcp && (
+          <div className="sb-import-section">
+            <div className="sb-import-section-head">
+              <strong>{t("switchboard.import.mcpTitle")}</strong>
+              <span className="sb-status-chip">{mcpTargets}</span>
+            </div>
+            <div className="sb-import-grid">
+              {patch.mcp?.id && (
+                <div className="sb-import-row">
+                  <span>{t("switchboard.mcp.id")}</span>
+                  <code>{patch.mcp.id}</code>
+                </div>
+              )}
+              {patch.mcp?.specText && (
+                <div className="sb-import-row sb-import-row-wide">
+                  <span>{t("switchboard.mcp.spec")}</span>
+                  <code>{compactPreview(patch.mcp.specText)}</code>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        <p className="sb-import-note">{t("switchboard.import.note")}</p>
+
+        <div className="sb-import-actions">
+          <button className="sb-secondary-button" type="button" onClick={onCancel}>
+            {t("switchboard.import.cancel")}
+          </button>
+          <button className="sb-primary-button" type="button" onClick={onConfirm}>
+            <CheckCircle2 size={16} />
+            {t("switchboard.import.confirm")}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function buildImportProviderRows(
+  providerPatch: SwitchboardImportPatch["provider"] | null,
+  t: (key: SwitchboardTranslationKey, vars?: Record<string, string | number>) => string,
+) {
+  if (!providerPatch) {
+    return [];
+  }
+  return [
+    { label: t("switchboard.provider.name"), value: providerPatch.name },
+    { label: t("switchboard.provider.baseUrl"), value: providerPatch.baseUrl },
+    { label: t("switchboard.provider.apiKey"), value: maskSecret(providerPatch.apiKey) },
+    { label: t("switchboard.provider.model"), value: providerPatch.model },
+    { label: t("switchboard.provider.modelsPath"), value: providerPatch.modelsPath },
+    { label: t("switchboard.provider.providerId"), value: providerPatch.providerId },
+    { label: t("switchboard.provider.reasoning"), value: providerPatch.reasoningEffort },
+  ].filter((row): row is { label: string; value: string } => typeof row.value === "string" && row.value.trim().length > 0);
+}
+
+function maskSecret(value: string | undefined): string | undefined {
+  if (!value) {
+    return value;
+  }
+  const trimmed = value.trim();
+  if (trimmed.length <= 8) {
+    return "****";
+  }
+  return `${trimmed.slice(0, 4)}****${trimmed.slice(-4)}`;
+}
+
+function compactPreview(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function parseProviderTarget(value: string | undefined): ProviderForm["target"] | undefined {
+  return value === "claude" || value === "codex" || value === "both" ? value : undefined;
 }
 
 function resolveImportTab(
@@ -307,7 +486,7 @@ function parseImportPatch(params: Record<string, string>): SwitchboardImportPatc
   }
 
   const provider = normalizeProviderPatch({
-    target: params.target,
+    target: parseProviderTarget(params.target),
     name: params.name,
     baseUrl: params.baseUrl ?? params.base_url,
     apiKey: params.apiKey ?? params.api_key,
