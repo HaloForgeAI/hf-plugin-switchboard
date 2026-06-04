@@ -13,8 +13,8 @@ The first release focuses on safe local writes: every apply/install operation cr
 ## Implemented
 
 - HaloForge Level 0 module plugin
-- Rust backend built with `haloforge-plugin-api` `0.2.9`
-- React frontend built with `@haloforge/plugin-sdk` `0.2.9`
+- Rust backend built with `haloforge-plugin-api` `0.2.10`
+- React frontend built with `@haloforge/plugin-sdk` `0.2.11`
 - Claude Code provider writes with `ANTHROPIC_BASE_URL`, token, and model env vars
 - Optional Claude `primaryApiKey` and onboarding flags used by switch workflows
 - Codex provider writes that preserve existing `config.toml` sections such as `[mcp_servers]` and `[profiles]`
@@ -26,6 +26,7 @@ The first release focuses on safe local writes: every apply/install operation cr
 - Cleanup for the old Codex provider entry when applying the current default provider id
 - Backups and restore for every changed config file
 - Windows MCP stdio wrapper for `npx`, `npm`, `yarn`, `pnpm`, `node`, `bun`, and `deno`
+- Manifest `window` policy for reusing the existing Provider Router module when import deep links arrive
 
 ## Compatibility
 
@@ -70,20 +71,20 @@ npm run build
 Validate with the public packer:
 
 ```bash
-npx --yes @haloforge/plugin-pack@0.2.9 check .
+npx --yes @haloforge/plugin-pack@0.2.11 check .
 ```
 
 Package:
 
 ```bash
-npx --yes @haloforge/plugin-pack@0.2.9 pack . --release
+npx --yes @haloforge/plugin-pack@0.2.11 pack . --release
 ```
 
 Install the packaged plugin into a local HaloForge workspace with the `hf` CLI:
 
 ```bash
 cd /path/to/HaloForge
-npm run hf -- plugin install local /path/to/hf-plugin-switchboard/dist/package/dev.haloforge.switchboard-0.1.7.hfpkg --json
+npm run hf -- plugin install local /path/to/hf-plugin-switchboard/dist/package/dev.haloforge.switchboard-0.1.8.hfpkg --json
 npm run hf -- plugin list --json
 ```
 
