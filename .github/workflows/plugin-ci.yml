@@ -36,10 +36,10 @@ jobs:
         run: npm run build --prefix frontend
 
       - name: Check plugin manifest
-        run: npx --yes @haloforge/plugin-pack@0.2.11 check .
+        run: npx --yes @haloforge/plugin-pack@0.2.13 check .
 
       - name: Package Windows target
-        run: npx --yes @haloforge/plugin-pack@0.2.11 pack . --release --target x86_64-pc-windows-msvc --out dist/plugin-windows-x64
+        run: npx --yes @haloforge/plugin-pack@0.2.13 pack . --release --target x86_64-pc-windows-msvc --out dist/plugin-windows-x64
 
       - name: Upload package artifact
         uses: actions/upload-artifact@v4

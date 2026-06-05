@@ -13,8 +13,8 @@ The first release focuses on safe local writes: every apply/install operation cr
 ## Implemented
 
 - HaloForge Level 0 module plugin
-- Rust backend built with `haloforge-plugin-api` `0.2.10`
-- React frontend built with `@haloforge/plugin-sdk` `0.2.11`
+- Rust backend built with `haloforge-plugin-api` `0.2.13`
+- React frontend built with `@haloforge/plugin-sdk` `0.2.13`
 - Claude Code provider writes with `ANTHROPIC_BASE_URL`, token, and model env vars
 - Optional Claude `primaryApiKey` and onboarding flags used by switch workflows
 - Codex provider writes that preserve existing `config.toml` sections such as `[mcp_servers]` and `[profiles]`
@@ -71,13 +71,13 @@ npm run build
 Validate with the public packer:
 
 ```bash
-npx --yes @haloforge/plugin-pack@0.2.11 check .
+npx --yes @haloforge/plugin-pack@0.2.13 check .
 ```
 
 Package:
 
 ```bash
-npx --yes @haloforge/plugin-pack@0.2.11 pack . --release
+npx --yes @haloforge/plugin-pack@0.2.13 pack . --release
 ```
 
 Install the packaged plugin into a local HaloForge workspace with the `hf` CLI:
