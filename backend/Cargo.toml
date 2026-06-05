@@ -1,6 +1,6 @@
 [package]
 name = "hf-plugin-switchboard"
-version = "0.1.8"
+version = "0.1.9"
 edition = "2021"
 description = "HaloForge Switchboard plugin backend"
 license = "MIT"
