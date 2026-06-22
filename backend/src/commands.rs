@@ -4,7 +4,7 @@ use crate::types::{
     ApplyProviderArgs, ApplyProviderResult, CleanupCodexArgs, CleanupCodexResult,
     DiscoverModelsArgs, InstallMcpArgs, InstallMcpResult, RestoreBackupArgs, RestoreBackupResult,
 };
-use crate::{backup, mcp, provider, status};
+use crate::{backup, codex_fixes, mcp, provider, status};
 use hf_plugin_api::{PluginContext, PluginError};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -91,6 +91,22 @@ pub fn switchboard_cleanup_codex(
         backup,
         changed_paths: pathbufs_to_strings(&touched),
     })
+}
+
+pub fn switchboard_codex_log_fix_status(
+    _args: Value,
+    _ctx: &dyn PluginContext,
+) -> Result<Value, PluginError> {
+    let paths = SwitchboardPaths::resolve()?;
+    to_value(codex_fixes::codex_log_fix_status(&paths)?)
+}
+
+pub fn switchboard_apply_codex_log_fix(
+    _args: Value,
+    _ctx: &dyn PluginContext,
+) -> Result<Value, PluginError> {
+    let paths = SwitchboardPaths::resolve()?;
+    to_value(codex_fixes::apply_codex_log_fix(&paths)?)
 }
 
 pub fn switchboard_install_mcp(args: Value, ctx: &dyn PluginContext) -> Result<Value, PluginError> {

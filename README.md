@@ -24,6 +24,7 @@ The first release focuses on safe local writes: every apply/install operation cr
 - Codex MCP header alias handling: `headers` and `http_headers`
 - Cleanup for legacy Codex `[mcp.servers]` when installing into `[mcp_servers]`
 - Cleanup for the old Codex provider entry when applying the current default provider id
+- Built-in Codex SQLite feedback log fix that checks and installs a `block_log_inserts` trigger in `logs_2.sqlite`
 - Backups and restore for every changed config file
 - Windows MCP stdio wrapper for `npx`, `npm`, `yarn`, `pnpm`, `node`, `bun`, and `deno`
 - Manifest `window` policy for reusing the existing Provider Router module when import deep links arrive
@@ -84,7 +85,7 @@ Install the packaged plugin into a local HaloForge workspace with the `hf` CLI:
 
 ```bash
 cd /path/to/HaloForge
-npm run hf -- plugin install local /path/to/hf-plugin-switchboard/dist/package/dev.haloforge.switchboard-0.1.8.hfpkg --json
+npm run hf -- plugin install local /path/to/hf-plugin-switchboard/dist/package/dev.haloforge.switchboard-0.1.12.hfpkg --json
 npm run hf -- plugin list --json
 ```
 

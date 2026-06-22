@@ -1,11 +1,19 @@
 import { invokePlugin } from "@haloforge/plugin-sdk";
 import { useCallback, useEffect, useState } from "react";
 import { useSwitchboardT } from "../i18n";
-import type { BackupInfo, CleanupCodexForm, McpAppSelection, ProviderForm, SwitchboardStatus } from "../types";
+import type {
+  BackupInfo,
+  CleanupCodexForm,
+  CodexLogFixStatus,
+  McpAppSelection,
+  ProviderForm,
+  SwitchboardStatus,
+} from "../types";
 
 export function useSwitchboard() {
   const t = useSwitchboardT();
   const [status, setStatus] = useState<SwitchboardStatus | null>(null);
+  const [codexLogFixStatus, setCodexLogFixStatus] = useState<CodexLogFixStatus | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -89,6 +97,40 @@ export function useSwitchboard() {
     [refresh, t],
   );
 
+  const checkCodexLogFix = useCallback(
+    async () => {
+      setBusy("codex-log-fix-check");
+      setMessage(null);
+      try {
+        const result = await invokePlugin<CodexLogFixStatus>("switchboard_codex_log_fix_status", {});
+        setCodexLogFixStatus(result);
+        setMessage(t("switchboard.message.codexLogFixChecked"));
+      } catch (error) {
+        setMessage(formatError(error));
+      } finally {
+        setBusy(null);
+      }
+    },
+    [t],
+  );
+
+  const applyCodexLogFix = useCallback(
+    async () => {
+      setBusy("codex-log-fix-apply");
+      setMessage(null);
+      try {
+        const result = await invokePlugin<CodexLogFixStatus>("switchboard_apply_codex_log_fix", {});
+        setCodexLogFixStatus(result);
+        setMessage(t("switchboard.message.codexLogFixApplied"));
+      } catch (error) {
+        setMessage(formatError(error));
+      } finally {
+        setBusy(null);
+      }
+    },
+    [t],
+  );
+
   const discoverModels = useCallback(
     async (form: Pick<ProviderForm, "baseUrl" | "apiKey" | "modelsPath">) => {
       setBusy("models");
@@ -136,6 +178,7 @@ export function useSwitchboard() {
 
   return {
     status,
+    codexLogFixStatus,
     busy,
     message,
     setMessage,
@@ -143,6 +186,8 @@ export function useSwitchboard() {
     applyProvider,
     installMcp,
     cleanupCodex,
+    checkCodexLogFix,
+    applyCodexLogFix,
     discoverModels,
     restoreBackup,
   };

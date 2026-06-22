@@ -119,6 +119,16 @@ pub struct CleanupCodexResult {
     pub changed_paths: Vec<String>,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CodexLogFixResult {
+    pub candidate_paths: Vec<String>,
+    pub database_path: Option<String>,
+    pub status: String,
+    pub trigger_name: String,
+    pub message: String,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InstallMcpArgs {

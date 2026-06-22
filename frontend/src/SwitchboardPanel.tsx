@@ -2,6 +2,7 @@ import { clearPendingPluginDeepLink, usePluginDeepLink, usePluginSettings, type 
 import { Bot, Braces, CheckCircle2, KeyRound, LayoutDashboard, RefreshCcw, Shield, TerminalSquare, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { BackupPanel } from "./components/BackupPanel";
+import { CodexToolsPanel } from "./components/CodexToolsPanel";
 import { McpPanel } from "./components/McpPanel";
 import { ProviderPanel } from "./components/ProviderPanel";
 import { TargetCard } from "./components/TargetCard";
@@ -39,6 +40,7 @@ export function SwitchboardPanel() {
   const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
   const {
     status,
+    codexLogFixStatus,
     busy,
     message,
     setMessage,
@@ -46,6 +48,8 @@ export function SwitchboardPanel() {
     applyProvider,
     installMcp,
     cleanupCodex,
+    checkCodexLogFix,
+    applyCodexLogFix,
     discoverModels,
     restoreBackup,
   } = useSwitchboard();
@@ -238,6 +242,13 @@ export function SwitchboardPanel() {
 
       {activeTab === "codex" && (
         <section className="sb-pane">
+          <CodexToolsPanel
+            status={codexLogFixStatus}
+            busy={busy}
+            onCheck={() => void checkCodexLogFix()}
+            onApply={() => void applyCodexLogFix()}
+            t={t}
+          />
           <ProviderPanel
             target="codex"
             status={codexStatus}

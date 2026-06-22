@@ -95,6 +95,18 @@
   color: #15803d;
 }
 
+.sb-status-chip-warn {
+  border-color: rgba(217, 119, 6, 0.3);
+  background: rgba(217, 119, 6, 0.1);
+  color: #b45309;
+}
+
+.sb-status-chip-danger {
+  border-color: rgba(220, 38, 38, 0.28);
+  background: rgba(220, 38, 38, 0.1);
+  color: #b91c1c;
+}
+
 .sb-tabbar {
   display: flex;
   flex-wrap: wrap;
@@ -515,6 +527,70 @@
 .sb-backup-item strong {
   font-size: 13px;
   font-weight: 700;
+}
+
+.sb-tool-panel {
+  gap: 14px;
+}
+
+.sb-tool-row,
+.sb-tool-title-row {
+  display: flex;
+  gap: 12px;
+}
+
+.sb-tool-row {
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sb-tool-title-row {
+  min-width: 0;
+  align-items: flex-start;
+}
+
+.sb-tool-copy {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.sb-tool-copy strong {
+  color: var(--color-foreground, #15171a);
+  font-size: 13px;
+}
+
+.sb-tool-copy span {
+  color: color-mix(in srgb, var(--color-foreground, #15171a) 64%, transparent);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.sb-tool-result {
+  display: grid;
+  gap: 10px;
+}
+
+.sb-candidate-details {
+  padding: 0;
+}
+
+.sb-candidate-list {
+  display: grid;
+  gap: 6px;
+  padding: 0 14px 14px;
+}
+
+.sb-candidate-list code {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--color-border, #d9dee7) 78%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-surface, #ffffff) 82%, transparent);
+  padding: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sb-actions {

@@ -4,6 +4,7 @@ use hf_plugin_api::{
 };
 
 mod backup;
+mod codex_fixes;
 mod commands;
 mod fs_util;
 mod mcp;
@@ -60,6 +61,14 @@ impl HaloForgePlugin for SwitchboardPlugin {
         ipc.register(
             "switchboard_cleanup_codex",
             Box::new(commands::switchboard_cleanup_codex),
+        )?;
+        ipc.register(
+            "switchboard_codex_log_fix_status",
+            Box::new(commands::switchboard_codex_log_fix_status),
+        )?;
+        ipc.register(
+            "switchboard_apply_codex_log_fix",
+            Box::new(commands::switchboard_apply_codex_log_fix),
         )?;
         ipc.register(
             "switchboard_install_mcp",

@@ -79,6 +79,14 @@ export interface CleanupCodexForm {
   providerId: string;
 }
 
+export interface CodexLogFixStatus {
+  candidatePaths: string[];
+  databasePath?: string | null;
+  status: "not_found" | "unsupported" | "ready" | "applied" | string;
+  triggerName: string;
+  message: string;
+}
+
 export interface McpAppSelection {
   claude: boolean;
   codex: boolean;
