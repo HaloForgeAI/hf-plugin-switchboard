@@ -1,6 +1,9 @@
 name: Plugin Release
 
 on:
+  push:
+    tags:
+      - "v*"
   workflow_dispatch:
     inputs:
       release_tag:
@@ -28,25 +31,16 @@ jobs:
       HF_ADMIN_TOKEN: ${{ secrets.HF_ADMIN_TOKEN }}
 
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: x86_64-pc-windows-msvc
-
       - name: Validate release inputs
         shell: pwsh
+        env:
+          RELEASE_TAG_INPUT: ${{ github.event_name == 'push' && github.ref_name || inputs.release_tag }}
+          RELEASE_TITLE_INPUT: ${{ inputs.release_name }}
+          RELEASE_SOURCE_INPUT: ${{ github.event_name == 'push' && 'official' || inputs.source }}
         run: |
-          $tag = "${{ inputs.release_tag }}".Trim()
-          $title = "${{ inputs.release_name }}".Trim()
+          $tag = ([string]$env:RELEASE_TAG_INPUT).Trim()
+          $title = ([string]$env:RELEASE_TITLE_INPUT).Trim()
+          $source = ([string]$env:RELEASE_SOURCE_INPUT).Trim()
 
           if ([string]::IsNullOrWhiteSpace($tag)) {
             throw "release_tag is required."
@@ -60,9 +54,28 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($title)) {
             $title = "Switchboard $tag"
           }
+          if ([string]::IsNullOrWhiteSpace($source)) {
+            $source = "official"
+          }
 
           "RELEASE_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append
           "RELEASE_TITLE=$title" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "RELEASE_SOURCE=$source" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'push' && github.ref || inputs.release_tag }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
 
       - name: Package .hfpkg
         shell: pwsh
@@ -128,7 +141,7 @@ jobs:
             "--yes", "@haloforge/plugin-pack@0.2.13",
             "metadata", "$env:PKG_PATH",
             "--artifact-url", $artifactUrl,
-            "--source", "${{ inputs.source }}",
+            "--source", "$env:RELEASE_SOURCE",
             "--homepage-url", "https://haloforge.dev/catalog/plugins/switchboard",
             "--repository-url", "https://github.com/${{ github.repository }}",
             "--pretty",
