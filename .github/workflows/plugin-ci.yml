@@ -7,9 +7,23 @@ on:
   workflow_dispatch:
 
 jobs:
-  windows-x64:
-    name: Windows x64
-    runs-on: windows-latest
+  package:
+    name: ${{ matrix.platform.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - name: Windows x64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            out: dist/plugin-windows-x64
+            artifact: switchboard-windows-x64
+          - name: macOS arm64
+            os: macos-26
+            target: aarch64-apple-darwin
+            out: dist/plugin-macos-arm64
+            artifact: switchboard-macos-arm64
+    runs-on: ${{ matrix.platform.os }}
 
     steps:
       - uses: actions/checkout@v4
@@ -24,7 +38,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: x86_64-pc-windows-msvc
+          targets: ${{ matrix.platform.target }}
 
       - name: Install frontend dependencies
         run: npm ci --prefix frontend
@@ -38,13 +52,13 @@ jobs:
       - name: Check plugin manifest
         run: npx --yes @haloforge/plugin-pack@0.2.13 check .
 
-      - name: Package Windows target
-        run: npx --yes @haloforge/plugin-pack@0.2.13 pack . --release --target x86_64-pc-windows-msvc --out dist/plugin-windows-x64
+      - name: Package target
+        run: npx --yes @haloforge/plugin-pack@0.2.13 pack . --release --target ${{ matrix.platform.target }} --out ${{ matrix.platform.out }}
 
       - name: Upload package artifact
         uses: actions/upload-artifact@v4
         with:
-          name: switchboard-windows-x64
+          name: ${{ matrix.platform.artifact }}
           path: |
-            dist/plugin-windows-x64/*.hfpkg
-            dist/plugin-windows-x64/*.hfpkg.sha256
+            ${{ matrix.platform.out }}/*.hfpkg
+            ${{ matrix.platform.out }}/*.hfpkg.sha256
