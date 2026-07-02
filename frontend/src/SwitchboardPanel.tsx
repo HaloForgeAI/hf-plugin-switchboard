@@ -40,7 +40,7 @@ export function SwitchboardPanel() {
   const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
   const {
     status,
-    codexLogFixStatus,
+    codexSessionAudit,
     busy,
     message,
     setMessage,
@@ -48,8 +48,8 @@ export function SwitchboardPanel() {
     applyProvider,
     installMcp,
     cleanupCodex,
-    checkCodexLogFix,
-    applyCodexLogFix,
+    checkCodexSessions,
+    repairCodexSessions,
     discoverModels,
     restoreBackup,
   } = useSwitchboard();
@@ -243,10 +243,10 @@ export function SwitchboardPanel() {
       {activeTab === "codex" && (
         <section className="sb-pane">
           <CodexToolsPanel
-            status={codexLogFixStatus}
+            audit={codexSessionAudit}
             busy={busy}
-            onCheck={() => void checkCodexLogFix()}
-            onApply={() => void applyCodexLogFix()}
+            onCheck={() => void checkCodexSessions()}
+            onRepair={() => void repairCodexSessions()}
             t={t}
           />
           <ProviderPanel

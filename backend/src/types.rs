@@ -4,7 +4,8 @@ use serde_json::Value;
 pub const CLAUDE_TARGET: &str = "claude";
 pub const CODEX_TARGET: &str = "codex";
 pub const BOTH_TARGET: &str = "both";
-pub const DEFAULT_CODEX_PROVIDER_ID: &str = "haloforge_gateway";
+pub const DEFAULT_CODEX_PROVIDER_ID: &str = "openai";
+pub const PREVIOUS_DEFAULT_CODEX_PROVIDER_ID: &str = "haloforge_gateway";
 pub const LEGACY_CODEX_PROVIDER_ID: &str = "switchboard";
 
 #[derive(Debug, Serialize)]
@@ -121,12 +122,47 @@ pub struct CleanupCodexResult {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CodexLogFixResult {
-    pub candidate_paths: Vec<String>,
-    pub database_path: Option<String>,
-    pub status: String,
-    pub trigger_name: String,
-    pub message: String,
+pub struct CodexSessionProviderCount {
+    pub provider: String,
+    pub count: usize,
+    pub current: bool,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CodexSessionAudit {
+    pub codex_home: String,
+    pub current_provider: String,
+    pub session_files: usize,
+    pub archived_session_files: usize,
+    pub sessions_missing_provider: usize,
+    pub hidden_session_candidates: usize,
+    pub indexed_sessions: usize,
+    pub state_database_path: Option<String>,
+    pub state_thread_rows: usize,
+    pub state_thread_current_provider: usize,
+    pub state_thread_other_provider: usize,
+    pub state_thread_missing_provider: usize,
+    pub provider_counts: Vec<CodexSessionProviderCount>,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CodexSessionRepairArgs {
+    pub include_archived: Option<bool>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CodexSessionRepairResult {
+    pub backup: BackupInfo,
+    pub changed_paths: Vec<String>,
+    pub session_files_changed: usize,
+    pub state_threads_updated: usize,
+    pub target_provider: String,
+    pub audit: CodexSessionAudit,
+    pub warnings: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]

@@ -1,7 +1,7 @@
 import type { PluginSettings, ProviderForm } from "./types";
 
-export const DEFAULT_PROVIDER_NAME = "HaloForge Gateway";
-export const DEFAULT_CODEX_PROVIDER_ID = "haloforge_gateway";
+export const DEFAULT_PROVIDER_NAME = "OpenAI Official";
+export const DEFAULT_CODEX_PROVIDER_ID = "openai";
 
 export const DEFAULT_MCP_SPEC = `{
   "type": "stdio",

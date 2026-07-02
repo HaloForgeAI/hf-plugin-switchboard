@@ -17,14 +17,15 @@ The first release focuses on safe local writes: every apply/install operation cr
 - React frontend built with `@haloforge/plugin-sdk` `0.2.13`
 - Claude Code provider writes with `ANTHROPIC_BASE_URL`, token, and model env vars
 - Optional Claude `primaryApiKey` and onboarding flags used by switch workflows
-- Codex provider writes that preserve existing `config.toml` sections such as `[mcp_servers]` and `[profiles]`
-- Stable Codex `model_provider = "haloforge_gateway"` by default, so session history does not move between provider buckets
+- Codex provider writes that preserve existing `config.toml` sections such as `[mcp_servers]` and legacy `[profiles]`
+- Official Codex `model_provider = "openai"` by default with `openai_base_url`, matching current Codex config guidance for routing the built-in provider through a proxy or gateway
+- Codex session visibility audit for provider/account switches, including rollout JSONL provider buckets and Desktop `state_*.sqlite` thread metadata
+- Backup-first Codex session metadata repair that retags hidden active sessions and Desktop thread rows to the current provider
 - Optional model discovery from an OpenAI-compatible `/models` path
 - MCP install for `stdio`, `http`, and `sse` specs
 - Codex MCP header alias handling: `headers` and `http_headers`
 - Cleanup for legacy Codex `[mcp.servers]` when installing into `[mcp_servers]`
 - Cleanup for the old Codex provider entry when applying the current default provider id
-- Built-in Codex SQLite feedback log fix that checks and installs a `block_log_inserts` trigger in `logs_2.sqlite`
 - Backups and restore for every changed config file
 - Windows MCP stdio wrapper for `npx`, `npm`, `yarn`, `pnpm`, `node`, `bun`, and `deno`
 - Manifest `window` policy for reusing the existing Provider Router module when import deep links arrive
@@ -40,7 +41,7 @@ The source keeps platform-aware paths for macOS and Windows, but the current Git
 
 ## Scope
 
-The implementation covers Claude Code env config, Codex provider/auth files, MCP config paths, Windows stdio command wrapping, backup-first writes, stable Codex provider IDs, and OpenAI-compatible provider fields.
+The implementation covers Claude Code env config, Codex provider/auth files, MCP config paths, Windows stdio command wrapping, backup-first writes, Codex session visibility repair, and OpenAI-compatible provider fields.
 
 The following are intentionally not in the first release:
 
@@ -50,6 +51,7 @@ The following are intentionally not in the first release:
 - Additional client targets such as Gemini, OpenCode, OpenClaw, Hermes, and Claude Desktop
 - Custom config directory overrides
 - Prompt and skill installers
+- Direct SQLite log write blocking; recent Codex builds have retention/checkpoint behavior, so Switchboard no longer mutates Codex log databases
 
 ## Development
 
@@ -85,7 +87,7 @@ Install the packaged plugin into a local HaloForge workspace with the `hf` CLI:
 
 ```bash
 cd /path/to/HaloForge
-npm run hf -- plugin install local /path/to/hf-plugin-switchboard/dist/package/dev.haloforge.switchboard-0.1.12.hfpkg --json
+npm run hf -- plugin install local /path/to/hf-plugin-switchboard/dist/package/dev.haloforge.switchboard-0.1.13.hfpkg --json
 npm run hf -- plugin list --json
 ```
 

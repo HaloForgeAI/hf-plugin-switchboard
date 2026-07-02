@@ -39,9 +39,15 @@ fn claude_status(paths: &SwitchboardPaths) -> TargetStatus {
             let env = value.get("env")?.as_object()?;
             let base = env.get("ANTHROPIC_BASE_URL").and_then(Value::as_str);
             let model = env.get("ANTHROPIC_MODEL").and_then(Value::as_str);
-            let haiku = env.get("ANTHROPIC_DEFAULT_HAIKU_MODEL").and_then(Value::as_str);
-            let sonnet = env.get("ANTHROPIC_DEFAULT_SONNET_MODEL").and_then(Value::as_str);
-            let opus = env.get("ANTHROPIC_DEFAULT_OPUS_MODEL").and_then(Value::as_str);
+            let haiku = env
+                .get("ANTHROPIC_DEFAULT_HAIKU_MODEL")
+                .and_then(Value::as_str);
+            let sonnet = env
+                .get("ANTHROPIC_DEFAULT_SONNET_MODEL")
+                .and_then(Value::as_str);
+            let opus = env
+                .get("ANTHROPIC_DEFAULT_OPUS_MODEL")
+                .and_then(Value::as_str);
             let token = env
                 .get("ANTHROPIC_AUTH_TOKEN")
                 .or_else(|| env.get("ANTHROPIC_API_KEY"))
@@ -52,9 +58,17 @@ fn claude_status(paths: &SwitchboardPaths) -> TargetStatus {
             push_detail(&mut details, "Sonnet model", sonnet, None);
             push_detail(&mut details, "Opus model", opus, None);
             if let Some(token) = token {
-                push_detail(&mut details, "API key", Some(&mask_secret(token)), Some(token));
+                push_detail(
+                    &mut details,
+                    "API key",
+                    Some(&mask_secret(token)),
+                    Some(token),
+                );
             }
-            Some(summary_parts([base.map(str::to_string), model.map(str::to_string)]))
+            Some(summary_parts([
+                base.map(str::to_string),
+                model.map(str::to_string),
+            ]))
         })
         .filter(|value| !value.is_empty());
 
@@ -92,6 +106,11 @@ fn codex_status(paths: &SwitchboardPaths) -> TargetStatus {
                     .and_then(|item| item.as_table())
                     .and_then(|table| table.get("base_url"))
                     .and_then(|item| item.as_str())
+                    .or_else(|| {
+                        (provider == "openai")
+                            .then(|| doc.get("openai_base_url").and_then(|item| item.as_str()))
+                            .flatten()
+                    })
                 {
                     push_detail(&mut details, "Base URL", Some(base_url), None);
                 }
@@ -113,7 +132,12 @@ fn codex_status(paths: &SwitchboardPaths) -> TargetStatus {
                     .and_then(|table| table.get("experimental_bearer_token"))
                     .and_then(|item| item.as_str())
                 {
-                    push_detail(&mut details, "Bearer token", Some(&mask_secret(token)), Some(token));
+                    push_detail(
+                        &mut details,
+                        "Bearer token",
+                        Some(&mask_secret(token)),
+                        Some(token),
+                    );
                 }
             }
             if let Some(model) = doc.get("model").and_then(|item| item.as_str()) {
@@ -126,9 +150,22 @@ fn codex_status(paths: &SwitchboardPaths) -> TargetStatus {
             {
                 push_detail(&mut details, "Reasoning", Some(reasoning), None);
             }
+            if doc.get("profiles").is_some() || doc.get("profile").is_some() {
+                push_detail(
+                    &mut details,
+                    "Legacy profiles",
+                    Some("Move to ~/.codex/<profile>.config.toml for Codex 0.134+"),
+                    None,
+                );
+            }
             let enabled_plugins = enabled_codex_builtin_plugins(&doc);
             if !enabled_plugins.is_empty() {
-                push_detail(&mut details, "Built-in plugins", Some(&enabled_plugins.join(", ")), None);
+                push_detail(
+                    &mut details,
+                    "Built-in plugins",
+                    Some(&enabled_plugins.join(", ")),
+                    None,
+                );
             }
         }
     }
@@ -189,9 +226,5 @@ fn path_status(label: &str, path: &Path) -> PathStatus {
 }
 
 fn summary_parts(parts: impl IntoIterator<Item = Option<String>>) -> String {
-    parts
-        .into_iter()
-        .flatten()
-        .collect::<Vec<_>>()
-        .join(" · ")
+    parts.into_iter().flatten().collect::<Vec<_>>().join(" · ")
 }

@@ -1,24 +1,29 @@
-import { DatabaseZap, Search, Wrench } from "lucide-react";
+import { History, Search, Wrench } from "lucide-react";
 import type { SwitchboardTranslationKey } from "../i18n";
-import type { BusyState, CodexLogFixStatus } from "../types";
+import type { BusyState, CodexSessionAudit } from "../types";
 
 interface CodexToolsPanelProps {
-  status: CodexLogFixStatus | null;
+  audit: CodexSessionAudit | null;
   busy: BusyState;
   onCheck: () => void;
-  onApply: () => void;
+  onRepair: () => void;
   t: (key: SwitchboardTranslationKey, vars?: Record<string, string | number>) => string;
 }
 
 export function CodexToolsPanel({
-  status,
+  audit,
   busy,
   onCheck,
-  onApply,
+  onRepair,
   t,
 }: CodexToolsPanelProps) {
-  const isBusy = busy === "codex-log-fix-check" || busy === "codex-log-fix-apply";
-  const isApplied = status?.status === "applied";
+  const isBusy = busy === "codex-session-audit" || busy === "codex-session-repair";
+  const needsRepair = Boolean(
+    audit &&
+      (audit.hiddenSessionCandidates > 0 ||
+        audit.stateThreadOtherProvider > 0 ||
+        audit.stateThreadMissingProvider > 0),
+  );
 
   return (
     <section className="sb-panel sb-tool-panel">
@@ -27,19 +32,23 @@ export function CodexToolsPanel({
           <h2>{t("switchboard.codexTools.title")}</h2>
           <p>{t("switchboard.codexTools.subtitle")}</p>
         </div>
-        <span className={statusChipClass(status?.status)}>
-          {status ? statusLabel(status.status, t) : t("switchboard.codexTools.status.unknown")}
+        <span className={statusChipClass(audit, needsRepair)}>
+          {audit
+            ? needsRepair
+              ? t("switchboard.codexTools.status.needsRepair")
+              : t("switchboard.codexTools.status.ok")
+            : t("switchboard.codexTools.status.unknown")}
         </span>
       </div>
 
       <div className="sb-tool-row">
         <div className="sb-tool-title-row">
           <span className="sb-tab-icon-badge" aria-hidden="true">
-            <DatabaseZap size={17} />
+            <History size={17} />
           </span>
           <div className="sb-tool-copy">
-            <strong>{t("switchboard.codexTools.sqliteTitle")}</strong>
-            <span>{t("switchboard.codexTools.sqliteBody")}</span>
+            <strong>{t("switchboard.codexTools.sessionsTitle")}</strong>
+            <span>{t("switchboard.codexTools.sessionsBody")}</span>
           </div>
         </div>
         <div className="sb-actions">
@@ -55,71 +64,91 @@ export function CodexToolsPanel({
           <button
             type="button"
             className="sb-primary-button"
-            disabled={isBusy || isApplied || (status?.status === "unsupported")}
-            onClick={onApply}
+            disabled={isBusy || !needsRepair}
+            onClick={onRepair}
           >
             <Wrench size={15} />
-            {t("switchboard.codexTools.apply")}
+            {t("switchboard.codexTools.repair")}
           </button>
         </div>
       </div>
 
-      {status && (
+      {audit && (
         <div className="sb-tool-result">
           <div className="sb-import-grid">
-            <div className="sb-import-row">
-              <span>{t("switchboard.codexTools.database")}</span>
-              <code>{status.databasePath ?? "-"}</code>
-            </div>
-            <div className="sb-import-row">
-              <span>{t("switchboard.codexTools.trigger")}</span>
-              <code>{status.triggerName}</code>
-            </div>
-            <div className="sb-import-row sb-import-row-wide">
-              <span>{t("switchboard.common.status")}</span>
-              <code>{status.message}</code>
-            </div>
+            <MetricRow label={t("switchboard.codexTools.currentProvider")} value={audit.currentProvider} />
+            <MetricRow label={t("switchboard.codexTools.hiddenSessions")} value={String(audit.hiddenSessionCandidates)} />
+            <MetricRow label={t("switchboard.codexTools.sessionFiles")} value={String(audit.sessionFiles)} />
+            <MetricRow label={t("switchboard.codexTools.archivedFiles")} value={String(audit.archivedSessionFiles)} />
+            <MetricRow label={t("switchboard.codexTools.indexedSessions")} value={String(audit.indexedSessions)} />
+            <MetricRow label={t("switchboard.codexTools.sqliteThreads")} value={String(audit.stateThreadRows)} />
+            <MetricRow
+              label={t("switchboard.codexTools.sqliteOther")}
+              value={String(audit.stateThreadOtherProvider + audit.stateThreadMissingProvider)}
+            />
+            <MetricRow label={t("switchboard.codexTools.codexHome")} value={audit.codexHome} wide />
+            <MetricRow label={t("switchboard.codexTools.database")} value={audit.stateDatabasePath ?? "-"} wide />
           </div>
-          <details className="sb-details sb-candidate-details">
-            <summary>
-              <div className="sb-details-copy">
-                <strong>{t("switchboard.codexTools.candidates")}</strong>
-                <span>{t("switchboard.codexTools.candidatesHint")}</span>
+
+          {audit.providerCounts.length > 0 && (
+            <details className="sb-details sb-candidate-details">
+              <summary>
+                <div className="sb-details-copy">
+                  <strong>{t("switchboard.codexTools.providerBuckets")}</strong>
+                  <span>{t("switchboard.codexTools.providerBucketsHint")}</span>
+                </div>
+              </summary>
+              <div className="sb-candidate-list">
+                {audit.providerCounts.map((item) => (
+                  <code key={item.provider}>
+                    {item.provider}: {item.count}
+                    {item.current ? ` ${t("switchboard.codexTools.currentMarker")}` : ""}
+                  </code>
+                ))}
               </div>
-            </summary>
-            <div className="sb-candidate-list">
-              {status.candidatePaths.map((path) => (
-                <code key={path}>{path}</code>
-              ))}
-            </div>
-          </details>
+            </details>
+          )}
+
+          {audit.warnings.length > 0 && (
+            <details className="sb-details sb-candidate-details">
+              <summary>
+                <div className="sb-details-copy">
+                  <strong>{t("switchboard.codexTools.warnings")}</strong>
+                  <span>{t("switchboard.codexTools.warningsHint")}</span>
+                </div>
+              </summary>
+              <div className="sb-candidate-list">
+                {audit.warnings.map((warning) => (
+                  <code key={warning}>{warning}</code>
+                ))}
+              </div>
+            </details>
+          )}
         </div>
       )}
     </section>
   );
 }
 
-function statusLabel(
-  status: string,
-  t: (key: SwitchboardTranslationKey, vars?: Record<string, string | number>) => string,
-) {
-  switch (status) {
-    case "applied":
-      return t("switchboard.codexTools.status.applied");
-    case "ready":
-      return t("switchboard.codexTools.status.ready");
-    case "not_found":
-      return t("switchboard.codexTools.status.notFound");
-    case "unsupported":
-      return t("switchboard.codexTools.status.unsupported");
-    default:
-      return t("switchboard.codexTools.status.unknown");
-  }
+function MetricRow({
+  label,
+  value,
+  wide,
+}: {
+  label: string;
+  value: string;
+  wide?: boolean;
+}) {
+  return (
+    <div className={wide ? "sb-import-row sb-import-row-wide" : "sb-import-row"}>
+      <span>{label}</span>
+      <code>{value}</code>
+    </div>
+  );
 }
 
-function statusChipClass(status: string | undefined) {
-  if (status === "applied") return "sb-status-chip sb-status-chip-on";
-  if (status === "ready") return "sb-status-chip sb-status-chip-warn";
-  if (status === "unsupported") return "sb-status-chip sb-status-chip-danger";
-  return "sb-status-chip";
+function statusChipClass(audit: CodexSessionAudit | null, needsRepair: boolean) {
+  if (!audit) return "sb-status-chip";
+  if (needsRepair) return "sb-status-chip sb-status-chip-warn";
+  return "sb-status-chip sb-status-chip-on";
 }

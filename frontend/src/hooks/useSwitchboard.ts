@@ -4,7 +4,7 @@ import { useSwitchboardT } from "../i18n";
 import type {
   BackupInfo,
   CleanupCodexForm,
-  CodexLogFixStatus,
+  CodexSessionAudit,
   McpAppSelection,
   ProviderForm,
   SwitchboardStatus,
@@ -13,7 +13,7 @@ import type {
 export function useSwitchboard() {
   const t = useSwitchboardT();
   const [status, setStatus] = useState<SwitchboardStatus | null>(null);
-  const [codexLogFixStatus, setCodexLogFixStatus] = useState<CodexLogFixStatus | null>(null);
+  const [codexSessionAudit, setCodexSessionAudit] = useState<CodexSessionAudit | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -97,14 +97,14 @@ export function useSwitchboard() {
     [refresh, t],
   );
 
-  const checkCodexLogFix = useCallback(
+  const checkCodexSessions = useCallback(
     async () => {
-      setBusy("codex-log-fix-check");
+      setBusy("codex-session-audit");
       setMessage(null);
       try {
-        const result = await invokePlugin<CodexLogFixStatus>("switchboard_codex_log_fix_status", {});
-        setCodexLogFixStatus(result);
-        setMessage(t("switchboard.message.codexLogFixChecked"));
+        const result = await invokePlugin<CodexSessionAudit>("switchboard_codex_session_audit", {});
+        setCodexSessionAudit(result);
+        setMessage(t("switchboard.message.codexSessionsChecked"));
       } catch (error) {
         setMessage(formatError(error));
       } finally {
@@ -114,14 +114,21 @@ export function useSwitchboard() {
     [t],
   );
 
-  const applyCodexLogFix = useCallback(
+  const repairCodexSessions = useCallback(
     async () => {
-      setBusy("codex-log-fix-apply");
+      setBusy("codex-session-repair");
       setMessage(null);
       try {
-        const result = await invokePlugin<CodexLogFixStatus>("switchboard_apply_codex_log_fix", {});
-        setCodexLogFixStatus(result);
-        setMessage(t("switchboard.message.codexLogFixApplied"));
+        const result = await invokePlugin<{
+          changedPaths: string[];
+          backup: BackupInfo;
+          audit: CodexSessionAudit;
+        }>("switchboard_repair_codex_sessions", { includeArchived: false });
+        setCodexSessionAudit(result.audit);
+        setMessage(t("switchboard.message.codexSessionsRepaired", {
+          count: result.changedPaths.length,
+          backupId: result.backup.id,
+        }));
       } catch (error) {
         setMessage(formatError(error));
       } finally {
@@ -178,7 +185,7 @@ export function useSwitchboard() {
 
   return {
     status,
-    codexLogFixStatus,
+    codexSessionAudit,
     busy,
     message,
     setMessage,
@@ -186,8 +193,8 @@ export function useSwitchboard() {
     applyProvider,
     installMcp,
     cleanupCodex,
-    checkCodexLogFix,
-    applyCodexLogFix,
+    checkCodexSessions,
+    repairCodexSessions,
     discoverModels,
     restoreBackup,
   };

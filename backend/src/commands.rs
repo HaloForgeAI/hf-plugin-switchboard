@@ -2,9 +2,10 @@ use crate::fs_util::{display_path, pathbufs_to_strings};
 use crate::paths::SwitchboardPaths;
 use crate::types::{
     ApplyProviderArgs, ApplyProviderResult, CleanupCodexArgs, CleanupCodexResult,
-    DiscoverModelsArgs, InstallMcpArgs, InstallMcpResult, RestoreBackupArgs, RestoreBackupResult,
+    CodexSessionRepairArgs, CodexSessionRepairResult, DiscoverModelsArgs, InstallMcpArgs,
+    InstallMcpResult, RestoreBackupArgs, RestoreBackupResult,
 };
-use crate::{backup, codex_fixes, mcp, provider, status};
+use crate::{backup, codex_sessions, mcp, provider, status};
 use hf_plugin_api::{PluginContext, PluginError};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -93,20 +94,37 @@ pub fn switchboard_cleanup_codex(
     })
 }
 
-pub fn switchboard_codex_log_fix_status(
+pub fn switchboard_codex_session_audit(
     _args: Value,
     _ctx: &dyn PluginContext,
 ) -> Result<Value, PluginError> {
     let paths = SwitchboardPaths::resolve()?;
-    to_value(codex_fixes::codex_log_fix_status(&paths)?)
+    to_value(codex_sessions::audit_codex_sessions(&paths)?)
 }
 
-pub fn switchboard_apply_codex_log_fix(
-    _args: Value,
-    _ctx: &dyn PluginContext,
+pub fn switchboard_repair_codex_sessions(
+    args: Value,
+    ctx: &dyn PluginContext,
 ) -> Result<Value, PluginError> {
+    let args: CodexSessionRepairArgs = parse_args(args)?;
     let paths = SwitchboardPaths::resolve()?;
-    to_value(codex_fixes::apply_codex_log_fix(&paths)?)
+    let plan = codex_sessions::plan_codex_session_provider_repair(
+        &paths,
+        args.include_archived.unwrap_or(false),
+    )?;
+    let backup = backup::create_backup(ctx, plan.backup_paths.clone())?;
+    let target_provider = plan.target_provider.clone();
+    let result = codex_sessions::apply_codex_session_provider_repair(&paths, plan)?;
+
+    to_value(CodexSessionRepairResult {
+        backup,
+        changed_paths: codex_sessions::changed_paths_for_result(&result.changed_paths),
+        session_files_changed: result.session_files_changed,
+        state_threads_updated: result.state_threads_updated,
+        target_provider,
+        audit: result.audit,
+        warnings: result.warnings,
+    })
 }
 
 pub fn switchboard_install_mcp(args: Value, ctx: &dyn PluginContext) -> Result<Value, PluginError> {

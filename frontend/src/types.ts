@@ -79,12 +79,27 @@ export interface CleanupCodexForm {
   providerId: string;
 }
 
-export interface CodexLogFixStatus {
-  candidatePaths: string[];
-  databasePath?: string | null;
-  status: "not_found" | "unsupported" | "ready" | "applied" | string;
-  triggerName: string;
-  message: string;
+export interface CodexSessionProviderCount {
+  provider: string;
+  count: number;
+  current: boolean;
+}
+
+export interface CodexSessionAudit {
+  codexHome: string;
+  currentProvider: string;
+  sessionFiles: number;
+  archivedSessionFiles: number;
+  sessionsMissingProvider: number;
+  hiddenSessionCandidates: number;
+  indexedSessions: number;
+  stateDatabasePath?: string | null;
+  stateThreadRows: number;
+  stateThreadCurrentProvider: number;
+  stateThreadOtherProvider: number;
+  stateThreadMissingProvider: number;
+  providerCounts: CodexSessionProviderCount[];
+  warnings: string[];
 }
 
 export interface McpAppSelection {
