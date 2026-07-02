@@ -19,14 +19,17 @@ The first release focuses on safe local writes: every apply/install operation cr
 - Optional Claude `primaryApiKey` and onboarding flags used by switch workflows
 - Codex provider writes that preserve existing `config.toml` sections such as `[mcp_servers]` and legacy `[profiles]`
 - Official Codex `model_provider = "openai"` by default with `openai_base_url`, matching current Codex config guidance for routing the built-in provider through a proxy or gateway
-- Codex session visibility audit for provider/account switches, including rollout JSONL provider buckets and Desktop `state_*.sqlite` thread metadata
-- Backup-first Codex session metadata repair that retags hidden active sessions and Desktop thread rows to the current provider
+- Codex auth modes for `auth.json` API keys, provider-scoped bearer tokens, and provider `env_key` entries
+- Lightweight provider presets for official OpenAI/Anthropic and common OpenAI-compatible Codex endpoints
+- Codex session visibility audit for provider/account switches, including rollout JSONL provider buckets, `session_index.jsonl`, and Desktop `state_*.sqlite` thread metadata
+- Backup-first Codex session repair that retags hidden active sessions, rebuilds the Desktop session index, and upserts missing Desktop thread rows to the current provider
+- Structure-preserving Codex `config.toml` updates via `toml_edit`; malformed or duplicate-key TOML fails closed before any live file is rewritten
 - Optional model discovery from an OpenAI-compatible `/models` path
 - MCP install for `stdio`, `http`, and `sse` specs
 - Codex MCP header alias handling: `headers` and `http_headers`
 - Cleanup for legacy Codex `[mcp.servers]` when installing into `[mcp_servers]`
 - Cleanup for the old Codex provider entry when applying the current default provider id
-- Backups and restore for every changed config file
+- Backups and restore for every changed config file, including a safety backup before a restore operation overwrites current files
 - Windows MCP stdio wrapper for `npx`, `npm`, `yarn`, `pnpm`, `node`, `bun`, and `deno`
 - Manifest `window` policy for reusing the existing Provider Router module when import deep links arrive
 
@@ -41,7 +44,7 @@ The source keeps platform-aware paths for macOS and Windows, but the current Git
 
 ## Scope
 
-The implementation covers Claude Code env config, Codex provider/auth files, MCP config paths, Windows stdio command wrapping, backup-first writes, Codex session visibility repair, and OpenAI-compatible provider fields.
+The implementation covers Claude Code env config, Codex provider/auth files, MCP config paths, Windows stdio command wrapping, backup-first writes, Codex session visibility/index repair, and OpenAI-compatible provider fields.
 
 The following are intentionally not in the first release:
 
@@ -87,7 +90,7 @@ Install the packaged plugin into a local HaloForge workspace with the `hf` CLI:
 
 ```bash
 cd /path/to/HaloForge
-npm run hf -- plugin install local /path/to/hf-plugin-switchboard/dist/package/dev.haloforge.switchboard-0.1.13.hfpkg --json
+npm run hf -- plugin install local /path/to/hf-plugin-switchboard/dist/package/dev.haloforge.switchboard-0.1.14.hfpkg --json
 npm run hf -- plugin list --json
 ```
 

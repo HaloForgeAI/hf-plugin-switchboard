@@ -9,6 +9,7 @@ use crate::{backup, codex_sessions, mcp, provider, status};
 use hf_plugin_api::{PluginContext, PluginError};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::PathBuf;
 
@@ -48,16 +49,27 @@ pub fn switchboard_restore_backup(
     let args: RestoreBackupArgs = parse_args(args)?;
     let backup = backup::read_backup_info(ctx, &args.backup_id)?;
     let backup_dir = backup::backup_dir(ctx).join(&backup.id);
+    let original_paths = backup
+        .files
+        .iter()
+        .map(|file| PathBuf::from(&file.original_path))
+        .collect::<Vec<_>>();
+    let safety_backup = backup::create_backup(ctx, original_paths)?;
     let mut restored = Vec::new();
+    let mut seen = BTreeSet::new();
 
     for file in &backup.files {
         let original = PathBuf::from(&file.original_path);
+        let original_display = display_path(&original);
+        if !seen.insert(original_display.clone()) {
+            continue;
+        }
         if file.existed {
             let rel = file
                 .backup_file
                 .as_deref()
                 .ok_or_else(|| PluginError::Custom("backup manifest missing backup file".into()))?;
-            let source = backup_dir.join(rel);
+            let source = safe_backup_source(&backup_dir, rel)?;
             if let Some(parent) = original.parent() {
                 fs::create_dir_all(parent)?;
             }
@@ -71,11 +83,12 @@ pub fn switchboard_restore_backup(
         } else if original.exists() {
             fs::remove_file(&original)?;
         }
-        restored.push(display_path(&original));
+        restored.push(original_display);
     }
 
     to_value(RestoreBackupResult {
         restored_paths: restored,
+        safety_backup,
     })
 }
 
@@ -120,6 +133,7 @@ pub fn switchboard_repair_codex_sessions(
         backup,
         changed_paths: codex_sessions::changed_paths_for_result(&result.changed_paths),
         session_files_changed: result.session_files_changed,
+        index_entries_written: result.index_entries_written,
         state_threads_updated: result.state_threads_updated,
         target_provider,
         audit: result.audit,
@@ -155,4 +169,18 @@ fn parse_args<T: for<'de> Deserialize<'de>>(args: Value) -> Result<T, PluginErro
 
 fn to_value<T: Serialize>(value: T) -> Result<Value, PluginError> {
     serde_json::to_value(value).map_err(|error| PluginError::Serialization(error.to_string()))
+}
+
+fn safe_backup_source(backup_dir: &std::path::Path, rel: &str) -> Result<PathBuf, PluginError> {
+    let rel_path = std::path::Path::new(rel);
+    if rel_path.is_absolute()
+        || rel_path
+            .components()
+            .any(|part| matches!(part, std::path::Component::ParentDir))
+    {
+        return Err(PluginError::Custom(
+            "backup manifest contains an unsafe file path".into(),
+        ));
+    }
+    Ok(backup_dir.join(rel_path))
 }

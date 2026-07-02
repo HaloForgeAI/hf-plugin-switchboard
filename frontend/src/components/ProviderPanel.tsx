@@ -2,6 +2,7 @@ import { AppSelect } from "@haloforge/plugin-sdk";
 import { CheckCircle2, ChevronDown, ListFilter, Settings2 } from "lucide-react";
 import { useState } from "react";
 import type { SwitchboardTranslationKey } from "../i18n";
+import { presetsForTarget } from "../providerPresets";
 import type { ProviderForm, SetProviderForm, TargetStatus } from "../types";
 
 interface ProviderPanelProps {
@@ -30,6 +31,7 @@ export function ProviderPanel({
   const isClaude = target === "claude";
   const [modelOptions, setModelOptions] = useState<string[]>([]);
   const hasModelOptions = modelOptions.length > 0;
+  const presets = presetsForTarget(target);
 
   const handleDiscoverModels = async () => {
     const models = await onDiscoverModels();
@@ -68,6 +70,25 @@ export function ProviderPanel({
       )}
 
       <div className="sb-form-grid">
+        <label>
+          <span>{t("switchboard.provider.preset")}</span>
+          <AppSelect
+            value=""
+            onChange={(event) => {
+              const preset = presets.find((item) => item.id === event.target.value);
+              if (preset) {
+                updateForm(setForm, preset.patch);
+              }
+            }}
+          >
+            <option value="">{t("switchboard.provider.preset.placeholder")}</option>
+            {presets.map((preset) => (
+              <option value={preset.id} key={preset.id}>
+                {preset.label}
+              </option>
+            ))}
+          </AppSelect>
+        </label>
         <label>
           <span>{t("switchboard.provider.baseUrl")}</span>
           <input
@@ -205,6 +226,30 @@ export function ProviderPanel({
                     <option value="low">{t("switchboard.provider.reasoning.low")}</option>
                   </AppSelect>
                 </label>
+                <label>
+                  <span>{t("switchboard.provider.codexAuthMode")}</span>
+                  <AppSelect
+                    value={form.codexAuthMode}
+                    onChange={(event) => updateForm(setForm, {
+                      codexAuthMode: event.target.value as ProviderForm["codexAuthMode"],
+                    })}
+                  >
+                    <option value="api_key">{t("switchboard.provider.codexAuthMode.apiKey")}</option>
+                    <option value="provider_token">{t("switchboard.provider.codexAuthMode.providerToken")}</option>
+                    <option value="env_key">{t("switchboard.provider.codexAuthMode.envKey")}</option>
+                  </AppSelect>
+                </label>
+                {form.codexAuthMode === "env_key" && (
+                  <label>
+                    <span>{t("switchboard.provider.codexEnvKey")}</span>
+                    <input
+                      value={form.codexEnvKey}
+                      onChange={(event) => updateForm(setForm, { codexEnvKey: event.target.value })}
+                      placeholder="OPENROUTER_API_KEY"
+                      spellCheck={false}
+                    />
+                  </label>
+                )}
               </div>
               <div className="sb-options sb-options-cards">
                 <label>
@@ -216,17 +261,6 @@ export function ProviderPanel({
                   <span>
                     <strong>{t("switchboard.provider.enableBuiltinPlugins")}</strong>
                     <small>{t("switchboard.provider.enableBuiltinPluginsHint")}</small>
-                  </span>
-                </label>
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={form.preserveCodexChatgptAuth}
-                    onChange={(event) => updateForm(setForm, { preserveCodexChatgptAuth: event.target.checked })}
-                  />
-                  <span>
-                    <strong>{t("switchboard.provider.preserveChatgptAuth")}</strong>
-                    <small>{t("switchboard.provider.preserveChatgptAuthHint")}</small>
                   </span>
                 </label>
               </div>
@@ -256,5 +290,11 @@ export function ProviderPanel({
 }
 
 function updateForm(setForm: SetProviderForm, patch: Partial<ProviderForm>) {
-  setForm((current) => ({ ...current, ...patch }));
+  setForm((current) => {
+    const next = { ...current, ...patch };
+    if (patch.codexAuthMode) {
+      next.preserveCodexChatgptAuth = patch.codexAuthMode !== "api_key";
+    }
+    return next;
+  });
 }

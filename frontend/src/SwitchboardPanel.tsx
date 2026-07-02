@@ -423,6 +423,8 @@ function buildImportProviderRows(
     { label: t("switchboard.provider.modelsPath"), value: providerPatch.modelsPath },
     { label: t("switchboard.provider.providerId"), value: providerPatch.providerId },
     { label: t("switchboard.provider.reasoning"), value: providerPatch.reasoningEffort },
+    { label: t("switchboard.provider.codexAuthMode"), value: providerPatch.codexAuthMode },
+    { label: t("switchboard.provider.codexEnvKey"), value: providerPatch.codexEnvKey },
   ].filter((row): row is { label: string; value: string } => typeof row.value === "string" && row.value.trim().length > 0);
 }
 
@@ -473,10 +475,17 @@ function normalizeProviderPatch(
   if (target === "claude" || target === "codex" || target === "both") {
     patch.target = target;
   }
-  for (const key of ["name", "baseUrl", "apiKey", "modelsPath", "providerId", "model", "reasoningEffort", "haikuModel", "sonnetModel", "opusModel"] as const) {
+  for (const key of ["name", "baseUrl", "apiKey", "modelsPath", "providerId", "model", "reasoningEffort", "haikuModel", "sonnetModel", "opusModel", "codexEnvKey"] as const) {
     if (typeof value[key] === "string") {
       patch[key] = value[key];
     }
+  }
+  if (
+    value.codexAuthMode === "api_key" ||
+    value.codexAuthMode === "provider_token" ||
+    value.codexAuthMode === "env_key"
+  ) {
+    patch.codexAuthMode = value.codexAuthMode;
   }
   return Object.keys(patch).length > 0 ? patch : null;
 }
@@ -484,7 +493,7 @@ function normalizeProviderPatch(
 function parseImportPatch(params: Record<string, string>): SwitchboardImportPatch | null {
   const encoded = params.payload ?? params.data ?? params.config;
   if (encoded) {
-    const parsed = parseJsonPayload(encoded);
+    const parsed = parseJsonPayload(encoded, params);
     if (parsed) {
       return parsed;
     }
@@ -497,9 +506,9 @@ function parseImportPatch(params: Record<string, string>): SwitchboardImportPatc
   }
 
   const provider = normalizeProviderPatch({
-    target: parseProviderTarget(params.target),
+    target: parseProviderTarget(params.target ?? params.app),
     name: params.name,
-    baseUrl: params.baseUrl ?? params.base_url,
+    baseUrl: params.baseUrl ?? params.base_url ?? params.endpoint,
     apiKey: params.apiKey ?? params.api_key,
     modelsPath: params.modelsPath ?? params.models_path,
     providerId: params.providerId ?? params.provider_id,
@@ -508,6 +517,8 @@ function parseImportPatch(params: Record<string, string>): SwitchboardImportPatc
     haikuModel: params.haikuModel ?? params.haiku_model,
     sonnetModel: params.sonnetModel ?? params.sonnet_model,
     opusModel: params.opusModel ?? params.opus_model,
+    codexAuthMode: params.codexAuthMode ?? params.codex_auth_mode,
+    codexEnvKey: params.codexEnvKey ?? params.codex_env_key ?? params.env_key,
   });
   if (provider) {
     patch.provider = provider;
@@ -529,19 +540,112 @@ function parseImportPatch(params: Record<string, string>): SwitchboardImportPatc
   return patch.provider || patch.mcp || patch.tab ? patch : null;
 }
 
-function parseJsonPayload(value: string): SwitchboardImportPatch | null {
+function parseJsonPayload(value: string, params: Record<string, string>): SwitchboardImportPatch | null {
   for (const candidate of [value, decodeBase64Url(value)]) {
     if (!candidate) {
       continue;
     }
     try {
-      const parsed = JSON.parse(candidate) as SwitchboardImportPatch;
-      return parsed && typeof parsed === "object" ? parsed : null;
+      const parsed = JSON.parse(candidate);
+      if (!parsed || typeof parsed !== "object") {
+        return null;
+      }
+      return normalizeExternalImportPayload(parsed, params) ?? parsed as SwitchboardImportPatch;
     } catch {
       // Try the next encoding.
     }
   }
   return null;
+}
+
+function normalizeExternalImportPayload(
+  parsed: Record<string, unknown>,
+  params: Record<string, string>,
+): SwitchboardImportPatch | null {
+  const codex = normalizeCodexConfigImport(parsed, params);
+  if (codex) {
+    return { provider: codex, tab: "codex" };
+  }
+  const claude = normalizeClaudeConfigImport(parsed, params);
+  if (claude) {
+    return { provider: claude, tab: "claude" };
+  }
+  return null;
+}
+
+function normalizeCodexConfigImport(
+  parsed: Record<string, unknown>,
+  params: Record<string, string>,
+): SwitchboardImportPatch["provider"] | null {
+  if (typeof parsed.config !== "string" && typeof parsed.auth !== "object") {
+    return null;
+  }
+  const config = typeof parsed.config === "string" ? parsed.config : "";
+  const auth = parsed.auth && typeof parsed.auth === "object" ? parsed.auth as Record<string, unknown> : {};
+  const providerId = tomlString(config, "model_provider") ?? params.providerId ?? params.provider_id ?? "custom";
+  const providerBlock = providerId ? tomlProviderBlock(config, providerId) : "";
+  const bearerToken = tomlString(providerBlock, "experimental_bearer_token");
+  const envKey = tomlString(providerBlock, "env_key");
+  const apiKey = stringValue(auth.OPENAI_API_KEY) ?? bearerToken ?? "";
+  return normalizeProviderPatch({
+    target: "codex",
+    name: tomlString(providerBlock, "name") ?? params.name,
+    baseUrl: tomlString(providerBlock, "base_url") ?? tomlString(config, "openai_base_url") ?? params.endpoint,
+    apiKey,
+    providerId,
+    model: tomlString(config, "model") ?? params.model,
+    reasoningEffort: tomlString(config, "model_reasoning_effort") ?? params.reasoning_effort,
+    codexAuthMode: envKey ? "env_key" : bearerToken ? "provider_token" : "api_key",
+    codexEnvKey: envKey ?? "",
+  });
+}
+
+function normalizeClaudeConfigImport(
+  parsed: Record<string, unknown>,
+  params: Record<string, string>,
+): SwitchboardImportPatch["provider"] | null {
+  const env = parsed.env && typeof parsed.env === "object" ? parsed.env as Record<string, unknown> : null;
+  if (!env) {
+    return null;
+  }
+  return normalizeProviderPatch({
+    target: "claude",
+    name: params.name,
+    baseUrl: stringValue(env.ANTHROPIC_BASE_URL),
+    apiKey: stringValue(env.ANTHROPIC_AUTH_TOKEN) ?? stringValue(env.ANTHROPIC_API_KEY),
+    model: stringValue(env.ANTHROPIC_MODEL),
+    haikuModel: stringValue(env.ANTHROPIC_DEFAULT_HAIKU_MODEL),
+    sonnetModel: stringValue(env.ANTHROPIC_DEFAULT_SONNET_MODEL),
+    opusModel: stringValue(env.ANTHROPIC_DEFAULT_OPUS_MODEL),
+  });
+}
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+function tomlString(text: string, key: string): string | undefined {
+  const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = text.match(new RegExp(`^\\s*${escapedKey}\\s*=\\s*"((?:\\\\.|[^"])*)"`, "m"));
+  if (!match) {
+    return undefined;
+  }
+  try {
+    return JSON.parse(`"${match[1]}"`) as string;
+  } catch {
+    return match[1].replace(/\\"/g, '"');
+  }
+}
+
+function tomlProviderBlock(text: string, providerId: string): string {
+  const escaped = providerId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = text.match(new RegExp(`^\\s*\\[model_providers\\.${escaped}\\]\\s*$`, "m"));
+  if (!match || match.index === undefined) {
+    return "";
+  }
+  const rest = text.slice(match.index + match[0].length);
+  const nextSection = rest.search(/^\s*\[/m);
+  return nextSection >= 0 ? rest.slice(0, nextSection) : rest;
 }
 
 function decodeBase64Url(value: string): string | null {

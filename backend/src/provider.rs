@@ -24,6 +24,13 @@ const CODEX_BUILTIN_PLUGINS: &[(&str, &str)] = &[
     ("github@openai-curated", "GitHub"),
 ];
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum CodexAuthMode {
+    ApiKey,
+    ProviderToken,
+    EnvKey,
+}
+
 pub fn validate_provider_args(args: &ApplyProviderArgs) -> Result<(), PluginError> {
     if !matches!(
         args.target.as_str(),
@@ -40,8 +47,32 @@ pub fn validate_provider_args(args: &ApplyProviderArgs) -> Result<(), PluginErro
     if args.base_url.trim().is_empty() {
         return Err(PluginError::Custom("base URL is required".into()));
     }
-    if args.api_key.trim().is_empty() {
+    let codex_auth_mode = codex_auth_mode(args)?;
+    let needs_inline_api_key = applies_to(&args.target, CLAUDE_TARGET)
+        || (applies_to(&args.target, CODEX_TARGET) && codex_auth_mode != CodexAuthMode::EnvKey);
+    if needs_inline_api_key && args.api_key.trim().is_empty() {
         return Err(PluginError::Custom("API key is required".into()));
+    }
+    if applies_to(&args.target, CODEX_TARGET) {
+        let provider_id = args
+            .provider_id
+            .as_deref()
+            .map(sanitize_provider_id)
+            .filter(|value| !value.is_empty())
+            .unwrap_or_else(|| DEFAULT_CODEX_PROVIDER_ID.to_string());
+        if codex_auth_mode == CodexAuthMode::EnvKey {
+            let env_key = args.codex_env_key.as_deref().unwrap_or("").trim();
+            if env_key.is_empty() {
+                return Err(PluginError::Custom(
+                    "Codex env_key auth requires an environment variable name".into(),
+                ));
+            }
+            if provider_id == DEFAULT_CODEX_PROVIDER_ID {
+                return Err(PluginError::Custom(
+                    "Codex env_key auth requires a custom provider id; the built-in openai provider uses Codex login or auth.json".into(),
+                ));
+            }
+        }
     }
     Ok(())
 }
@@ -255,15 +286,19 @@ fn write_codex_provider(
     let model = defaulted(args.model.as_deref(), "gpt-5.4");
     let reasoning = defaulted(args.reasoning_effort.as_deref(), "high");
     let base_url = normalize_codex_base_url(&args.base_url);
+    let auth_mode = codex_auth_mode(args)?;
     let mut auth = read_json_object_or_empty(&paths.codex_auth_path)?;
     let auth_object = auth
         .as_object_mut()
         .ok_or_else(|| PluginError::Serialization("Codex auth root must be an object".into()))?;
-    if args.preserve_codex_chatgpt_auth.unwrap_or(false) {
-        auth_object.insert("auth_mode".into(), json!("chatgpt"));
-        auth_object.insert("OPENAI_API_KEY".into(), Value::Null);
-    } else {
-        auth_object.insert("OPENAI_API_KEY".into(), json!(args.api_key.trim()));
+    match auth_mode {
+        CodexAuthMode::ApiKey => {
+            auth_object.insert("OPENAI_API_KEY".into(), json!(args.api_key.trim()));
+        }
+        CodexAuthMode::ProviderToken | CodexAuthMode::EnvKey => {
+            auth_object.insert("auth_mode".into(), json!("chatgpt"));
+            auth_object.insert("OPENAI_API_KEY".into(), Value::Null);
+        }
     }
     let config_text = build_codex_config_text(
         &paths.codex_config_path,
@@ -274,7 +309,8 @@ fn write_codex_provider(
         &reasoning,
         args.api_key.trim(),
         args.enable_codex_builtin_plugins.unwrap_or(false),
-        args.preserve_codex_chatgpt_auth.unwrap_or(false),
+        auth_mode,
+        args.codex_env_key.as_deref(),
     )?;
 
     write_codex_live_atomic(
@@ -294,7 +330,8 @@ fn build_codex_config_text(
     reasoning_effort: &str,
     api_key: &str,
     enable_builtin_plugins: bool,
-    preserve_chatgpt_auth: bool,
+    auth_mode: CodexAuthMode,
+    env_key: Option<&str>,
 ) -> Result<String, PluginError> {
     let mut doc = read_existing_codex_doc(config_path)?;
     apply_codex_provider_doc(
@@ -306,7 +343,8 @@ fn build_codex_config_text(
         reasoning_effort,
         api_key,
         enable_builtin_plugins,
-        preserve_chatgpt_auth,
+        auth_mode,
+        env_key,
     );
 
     let text = doc.to_string();
@@ -343,7 +381,8 @@ fn apply_codex_provider_doc(
     reasoning_effort: &str,
     api_key: &str,
     enable_builtin_plugins: bool,
-    preserve_chatgpt_auth: bool,
+    auth_mode: CodexAuthMode,
+    env_key: Option<&str>,
 ) {
     doc["model_provider"] = toml_edit::value(provider_id);
     doc["model"] = toml_edit::value(model);
@@ -352,7 +391,7 @@ fn apply_codex_provider_doc(
 
     if provider_id == DEFAULT_CODEX_PROVIDER_ID {
         doc["openai_base_url"] = toml_edit::value(base_url);
-        if preserve_chatgpt_auth {
+        if auth_mode == CodexAuthMode::ProviderToken {
             doc["experimental_bearer_token"] = toml_edit::value(api_key);
         } else {
             doc.as_table_mut().remove("experimental_bearer_token");
@@ -375,9 +414,18 @@ fn apply_codex_provider_doc(
     provider["name"] = toml_edit::value(if name.is_empty() { provider_id } else { name });
     provider["base_url"] = toml_edit::value(base_url);
     provider["wire_api"] = toml_edit::value("responses");
-    provider["requires_openai_auth"] = toml_edit::value(true);
-    if preserve_chatgpt_auth {
-        provider["experimental_bearer_token"] = toml_edit::value(api_key);
+    match auth_mode {
+        CodexAuthMode::ApiKey => {
+            provider["requires_openai_auth"] = toml_edit::value(true);
+        }
+        CodexAuthMode::ProviderToken => {
+            provider["experimental_bearer_token"] = toml_edit::value(api_key);
+        }
+        CodexAuthMode::EnvKey => {
+            if let Some(env_key) = env_key.map(str::trim).filter(|value| !value.is_empty()) {
+                provider["env_key"] = toml_edit::value(env_key);
+            }
+        }
     }
     doc["model_providers"][provider_id] = Item::Table(provider);
 
@@ -568,6 +616,28 @@ fn defaulted(value: Option<&str>, fallback: &str) -> String {
         .to_string()
 }
 
+fn codex_auth_mode(args: &ApplyProviderArgs) -> Result<CodexAuthMode, PluginError> {
+    let value = args
+        .codex_auth_mode
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    match value {
+        Some("api_key") | Some("auth_json") => Ok(CodexAuthMode::ApiKey),
+        Some("provider_token") | Some("experimental_bearer_token") => {
+            Ok(CodexAuthMode::ProviderToken)
+        }
+        Some("env_key") => Ok(CodexAuthMode::EnvKey),
+        Some(other) => Err(PluginError::Custom(format!(
+            "unsupported Codex auth mode '{other}'"
+        ))),
+        None if args.preserve_codex_chatgpt_auth.unwrap_or(false) => {
+            Ok(CodexAuthMode::ProviderToken)
+        }
+        None => Ok(CodexAuthMode::ApiKey),
+    }
+}
+
 pub fn sanitize_provider_id(value: &str) -> String {
     let mut out = String::new();
     let mut last_was_underscore = false;
@@ -651,6 +721,40 @@ fn http_get_json(url: &str, api_key: &str) -> Result<String, PluginError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::fs_util::timestamp_id;
+
+    fn test_paths(root: &Path) -> SwitchboardPaths {
+        SwitchboardPaths {
+            home: root.join("home"),
+            claude_settings_path: root.join("home/.claude/settings.json"),
+            claude_config_path: root.join("home/.claude/config.json"),
+            claude_mcp_path: root.join("home/.claude.json"),
+            codex_auth_path: root.join(".codex/auth.json"),
+            codex_config_path: root.join(".codex/config.toml"),
+            codex_dir: root.join(".codex"),
+        }
+    }
+
+    fn codex_args() -> ApplyProviderArgs {
+        ApplyProviderArgs {
+            target: CODEX_TARGET.to_string(),
+            name: "Third Party".to_string(),
+            base_url: "https://new.example/v1".to_string(),
+            api_key: "sk-test".to_string(),
+            provider_id: Some("third_party".to_string()),
+            model: Some("gpt-5.5".to_string()),
+            reasoning_effort: Some("high".to_string()),
+            haiku_model: None,
+            sonnet_model: None,
+            opus_model: None,
+            set_claude_primary_api_key: None,
+            skip_claude_onboarding: None,
+            enable_codex_builtin_plugins: Some(true),
+            preserve_codex_chatgpt_auth: None,
+            codex_auth_mode: None,
+            codex_env_key: None,
+        }
+    }
 
     #[test]
     fn codex_base_url_adds_v1_only_to_origins() {
@@ -698,7 +802,8 @@ model = "gpt-4"
             "high",
             "sk-test",
             false,
-            false,
+            CodexAuthMode::ApiKey,
+            None,
         );
         let parsed: toml_edit::DocumentMut = doc.to_string().parse().expect("valid output");
 
@@ -747,7 +852,8 @@ wire_api = "responses"
             "high",
             "sk-test",
             false,
-            false,
+            CodexAuthMode::ApiKey,
+            None,
         );
 
         let parsed: DocumentMut = doc.to_string().parse().expect("valid output");
@@ -779,7 +885,8 @@ enabled = true
             "high",
             "sk-third-party",
             true,
-            true,
+            CodexAuthMode::ProviderToken,
+            None,
         );
 
         let parsed: DocumentMut = doc.to_string().parse().expect("valid output");
@@ -831,7 +938,8 @@ wire_api = "responses"
             "high",
             "sk-test",
             true,
-            false,
+            CodexAuthMode::ApiKey,
+            None,
         );
 
         let parsed: DocumentMut = doc.to_string().parse().expect("valid output");
@@ -957,5 +1065,88 @@ base_url = "https://other.example/v1"
             .and_then(|item| item.as_table())
             .and_then(|table| table.get("other"))
             .is_some());
+    }
+
+    #[test]
+    fn codex_provider_update_is_idempotent_for_managed_tables() {
+        let mut doc = DocumentMut::new();
+        for _ in 0..2 {
+            apply_codex_provider_doc(
+                &mut doc,
+                "third_party",
+                "Third Party",
+                "https://new.example/v1",
+                "gpt-5.5",
+                "high",
+                "sk-test",
+                true,
+                CodexAuthMode::ApiKey,
+                None,
+            );
+        }
+
+        let text = doc.to_string();
+        text.parse::<DocumentMut>().expect("valid output");
+        assert_eq!(text.matches("[model_providers.third_party]").count(), 1);
+        assert_eq!(text.matches("requires_openai_auth").count(), 1);
+        assert_eq!(
+            text.matches("[plugins.\"chrome@openai-bundled\"]").count(),
+            1
+        );
+    }
+
+    #[test]
+    fn codex_env_key_auth_writes_only_env_key_provider_auth() {
+        let mut doc = DocumentMut::new();
+        apply_codex_provider_doc(
+            &mut doc,
+            "openrouter",
+            "OpenRouter",
+            "https://openrouter.ai/api/v1",
+            "openai/gpt-5.5",
+            "high",
+            "",
+            false,
+            CodexAuthMode::EnvKey,
+            Some("OPENROUTER_API_KEY"),
+        );
+
+        let parsed: DocumentMut = doc.to_string().parse().expect("valid output");
+        let provider = parsed
+            .get("model_providers")
+            .and_then(|item| item.as_table())
+            .and_then(|table| table.get("openrouter"))
+            .and_then(|item| item.as_table())
+            .expect("provider table");
+        assert_eq!(
+            provider.get("env_key").and_then(|item| item.as_str()),
+            Some("OPENROUTER_API_KEY")
+        );
+        assert!(provider.get("requires_openai_auth").is_none());
+        assert!(provider.get("experimental_bearer_token").is_none());
+    }
+
+    #[test]
+    fn codex_provider_refuses_invalid_duplicate_toml_without_rewriting_auth() {
+        let root = std::env::temp_dir().join(format!("switchboard-provider-{}", timestamp_id()));
+        let paths = test_paths(&root);
+        fs::create_dir_all(&paths.codex_dir).expect("create codex dir");
+        let original_config = "model_provider = \"old\"\nmodel_provider = \"duplicate\"\n";
+        let original_auth = "{\n  \"OPENAI_API_KEY\": \"sk-old\"\n}\n";
+        fs::write(&paths.codex_config_path, original_config).expect("write config");
+        fs::write(&paths.codex_auth_path, original_auth).expect("write auth");
+
+        let error = apply_provider(&paths, &codex_args()).expect_err("invalid TOML should abort");
+        assert!(format!("{error:?}").contains("failed to parse existing Codex config.toml"));
+        assert_eq!(
+            fs::read_to_string(&paths.codex_config_path).expect("read config"),
+            original_config
+        );
+        assert_eq!(
+            fs::read_to_string(&paths.codex_auth_path).expect("read auth"),
+            original_auth
+        );
+
+        let _ = fs::remove_dir_all(root);
     }
 }

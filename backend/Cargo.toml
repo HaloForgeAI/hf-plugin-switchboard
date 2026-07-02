@@ -1,6 +1,6 @@
 [package]
 name = "hf-plugin-switchboard"
-version = "0.1.13"
+version = "0.1.14"
 edition = "2021"
 description = "HaloForge Switchboard plugin backend"
 license = "MIT"
@@ -10,6 +10,7 @@ name = "hf_plugin_switchboard"
 crate-type = ["cdylib"]
 
 [dependencies]
+chrono = { version = "0.4", default-features = false, features = ["std"] }
 dirs = "6"
 hf-plugin-api = { package = "haloforge-plugin-api", version = "0.2.13" }
 serde = { version = "1", features = ["derive"] }

@@ -139,6 +139,44 @@ fn codex_status(paths: &SwitchboardPaths) -> TargetStatus {
                         Some(token),
                     );
                 }
+                if let Some(env_key) = doc
+                    .get("model_providers")
+                    .and_then(|item| item.as_table())
+                    .and_then(|table| table.get(provider))
+                    .and_then(|item| item.as_table())
+                    .and_then(|table| table.get("env_key"))
+                    .and_then(|item| item.as_str())
+                {
+                    push_detail(&mut details, "Provider env_key", Some(env_key), None);
+                }
+                if let Some(requires_openai_auth) = doc
+                    .get("model_providers")
+                    .and_then(|item| item.as_table())
+                    .and_then(|table| table.get(provider))
+                    .and_then(|item| item.as_table())
+                    .and_then(|table| table.get("requires_openai_auth"))
+                    .and_then(|item| item.as_bool())
+                {
+                    let auth_label = if requires_openai_auth {
+                        "OpenAI auth"
+                    } else {
+                        "Provider local auth"
+                    };
+                    push_detail(&mut details, "Provider auth", Some(auth_label), None);
+                }
+                if provider == "openai" {
+                    if let Some(token) = doc
+                        .get("experimental_bearer_token")
+                        .and_then(|item| item.as_str())
+                    {
+                        push_detail(
+                            &mut details,
+                            "Bearer token",
+                            Some(&mask_secret(token)),
+                            Some(token),
+                        );
+                    }
+                }
             }
             if let Some(model) = doc.get("model").and_then(|item| item.as_str()) {
                 parts.push(model.to_string());

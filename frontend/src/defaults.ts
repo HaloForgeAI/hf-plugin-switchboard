@@ -26,5 +26,7 @@ export function defaultProviderForm(settings: PluginSettings): ProviderForm {
     skipClaudeOnboarding: true,
     enableCodexBuiltinPlugins: true,
     preserveCodexChatgptAuth: false,
+    codexAuthMode: "api_key",
+    codexEnvKey: "",
   };
 }

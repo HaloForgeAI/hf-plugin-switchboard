@@ -85,6 +85,8 @@ pub struct ApplyProviderArgs {
     #[serde(alias = "enableCodexChromePlugin")]
     pub enable_codex_builtin_plugins: Option<bool>,
     pub preserve_codex_chatgpt_auth: Option<bool>,
+    pub codex_auth_mode: Option<String>,
+    pub codex_env_key: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -105,6 +107,7 @@ pub struct RestoreBackupArgs {
 #[serde(rename_all = "camelCase")]
 pub struct RestoreBackupResult {
     pub restored_paths: Vec<String>,
+    pub safety_backup: BackupInfo,
 }
 
 #[derive(Debug, Deserialize)]
@@ -138,11 +141,14 @@ pub struct CodexSessionAudit {
     pub sessions_missing_provider: usize,
     pub hidden_session_candidates: usize,
     pub indexed_sessions: usize,
+    pub index_duplicate_entries: usize,
+    pub index_missing_sessions: usize,
     pub state_database_path: Option<String>,
     pub state_thread_rows: usize,
     pub state_thread_current_provider: usize,
     pub state_thread_other_provider: usize,
     pub state_thread_missing_provider: usize,
+    pub state_thread_missing_sessions: usize,
     pub provider_counts: Vec<CodexSessionProviderCount>,
     pub warnings: Vec<String>,
 }
@@ -159,6 +165,7 @@ pub struct CodexSessionRepairResult {
     pub backup: BackupInfo,
     pub changed_paths: Vec<String>,
     pub session_files_changed: usize,
+    pub index_entries_written: usize,
     pub state_threads_updated: usize,
     pub target_provider: String,
     pub audit: CodexSessionAudit,

@@ -21,8 +21,11 @@ export function CodexToolsPanel({
   const needsRepair = Boolean(
     audit &&
       (audit.hiddenSessionCandidates > 0 ||
+        audit.indexDuplicateEntries > 0 ||
+        audit.indexMissingSessions > 0 ||
         audit.stateThreadOtherProvider > 0 ||
-        audit.stateThreadMissingProvider > 0),
+        audit.stateThreadMissingProvider > 0 ||
+        audit.stateThreadMissingSessions > 0),
   );
 
   return (
@@ -81,11 +84,16 @@ export function CodexToolsPanel({
             <MetricRow label={t("switchboard.codexTools.sessionFiles")} value={String(audit.sessionFiles)} />
             <MetricRow label={t("switchboard.codexTools.archivedFiles")} value={String(audit.archivedSessionFiles)} />
             <MetricRow label={t("switchboard.codexTools.indexedSessions")} value={String(audit.indexedSessions)} />
+            <MetricRow
+              label={t("switchboard.codexTools.indexIssues")}
+              value={String(audit.indexDuplicateEntries + audit.indexMissingSessions)}
+            />
             <MetricRow label={t("switchboard.codexTools.sqliteThreads")} value={String(audit.stateThreadRows)} />
             <MetricRow
               label={t("switchboard.codexTools.sqliteOther")}
               value={String(audit.stateThreadOtherProvider + audit.stateThreadMissingProvider)}
             />
+            <MetricRow label={t("switchboard.codexTools.sqliteMissing")} value={String(audit.stateThreadMissingSessions)} />
             <MetricRow label={t("switchboard.codexTools.codexHome")} value={audit.codexHome} wide />
             <MetricRow label={t("switchboard.codexTools.database")} value={audit.stateDatabasePath ?? "-"} wide />
           </div>

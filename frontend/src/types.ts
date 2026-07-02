@@ -2,6 +2,7 @@ import type { Dispatch, SetStateAction } from "react";
 
 export type Target = "claude" | "codex" | "both";
 export type BusyState = string | null;
+export type CodexAuthMode = "api_key" | "provider_token" | "env_key";
 
 export interface PluginSettings {
   defaultTarget?: Target;
@@ -71,6 +72,8 @@ export interface ProviderForm {
   skipClaudeOnboarding: boolean;
   enableCodexBuiltinPlugins: boolean;
   preserveCodexChatgptAuth: boolean;
+  codexAuthMode: CodexAuthMode;
+  codexEnvKey: string;
 }
 
 export type SetProviderForm = Dispatch<SetStateAction<ProviderForm>>;
@@ -98,6 +101,9 @@ export interface CodexSessionAudit {
   stateThreadCurrentProvider: number;
   stateThreadOtherProvider: number;
   stateThreadMissingProvider: number;
+  stateThreadMissingSessions: number;
+  indexDuplicateEntries: number;
+  indexMissingSessions: number;
   providerCounts: CodexSessionProviderCount[];
   warnings: string[];
 }
@@ -128,6 +134,8 @@ export interface SwitchboardImportPatch {
     | "haikuModel"
     | "sonnetModel"
     | "opusModel"
+    | "codexAuthMode"
+    | "codexEnvKey"
   >>;
   mcp?: Partial<McpImportPatch>;
 }

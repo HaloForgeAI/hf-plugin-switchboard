@@ -169,10 +169,13 @@ export function useSwitchboard() {
       setBusy(`restore:${backupId}`);
       setMessage(null);
       try {
-        const result = await invokePlugin<{ restoredPaths: string[] }>("switchboard_restore_backup", {
+        const result = await invokePlugin<{ restoredPaths: string[]; safetyBackup: BackupInfo }>("switchboard_restore_backup", {
           backupId,
         });
-        setMessage(t("switchboard.message.backupRestored", { count: result.restoredPaths.length }));
+        setMessage(t("switchboard.message.backupRestored", {
+          count: result.restoredPaths.length,
+          backupId: result.safetyBackup.id,
+        }));
         await refresh();
       } catch (error) {
         setMessage(formatError(error));
