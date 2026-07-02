@@ -391,6 +391,7 @@
 .sb-shell .sb-app-select {
   height: 38px;
   min-width: 0;
+  padding-left: 11px;
   border: 1px solid var(--color-border, #d9dee7);
   border-radius: 8px;
   background: var(--color-background, #f7f8fb);
