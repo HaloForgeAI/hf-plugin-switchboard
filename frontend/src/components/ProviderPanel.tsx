@@ -73,6 +73,7 @@ export function ProviderPanel({
         <label>
           <span>{t("switchboard.provider.preset")}</span>
           <AppSelect
+            className="sb-app-select"
             value=""
             onChange={(event) => {
               const preset = presets.find((item) => item.id === event.target.value);
@@ -218,6 +219,7 @@ export function ProviderPanel({
                 <label>
                   <span>{t("switchboard.provider.reasoning")}</span>
                   <AppSelect
+                    className="sb-app-select"
                     value={form.reasoningEffort}
                     onChange={(event) => updateForm(setForm, { reasoningEffort: event.target.value })}
                   >
@@ -229,6 +231,7 @@ export function ProviderPanel({
                 <label>
                   <span>{t("switchboard.provider.codexAuthMode")}</span>
                   <AppSelect
+                    className="sb-app-select"
                     value={form.codexAuthMode}
                     onChange={(event) => updateForm(setForm, {
                       codexAuthMode: event.target.value as ProviderForm["codexAuthMode"],
