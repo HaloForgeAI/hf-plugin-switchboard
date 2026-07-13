@@ -2,7 +2,7 @@
   "$schema": "https://haloforge.dev/schemas/plugin/v1.json",
   "id": "dev.haloforge.switchboard",
   "name": "Provider Router",
-  "version": "0.1.15",
+  "version": "0.1.16",
   "description": "Fast local provider configuration for Claude Code, Codex, and MCP.",
   "long_description": "Adds a HaloForge module for applying provider endpoints to Claude Code and Codex, writing MCP server specs, and restoring local config backups.",
   "author": "HaloForge Team",
